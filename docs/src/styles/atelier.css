@@ -46,8 +46,8 @@
   --at-muted: #a29f95;
   --at-faint: #726f66;
   --at-accent: #ff4e45;
-  /* The red under text (the primary button): deeper than the accent, so light text reads on it. */
-  --at-accent-fill: #d6281e;
+  /* The red under text (the primary button). The bright accent here, by choice: light text on it is 3.2:1. */
+  --at-accent-fill: var(--at-accent);
   --at-on-accent: #fffdf8;
   --at-caution: #e0b050;
   --at-danger: #ff5a52;
