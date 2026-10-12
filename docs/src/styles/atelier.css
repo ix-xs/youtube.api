@@ -46,7 +46,9 @@
   --at-muted: #a29f95;
   --at-faint: #726f66;
   --at-accent: #ff4e45;
-  --at-on-accent: #1a0907;
+  /* The red under text (the primary button): deeper than the accent, so light text reads on it. */
+  --at-accent-fill: #d6281e;
+  --at-on-accent: #fffdf8;
   --at-caution: #e0b050;
   --at-danger: #ff5a52;
   --at-scrim: rgb(0 0 0 / 0.55);
@@ -71,7 +73,8 @@
   --sl-color-hairline-shade: var(--at-line);
   --sl-color-text: var(--at-muted);
   --sl-color-text-accent: var(--at-accent);
-  --sl-color-text-invert: var(--at-on-accent);
+  /* What Starlight writes on the bright accent itself (skip link, file tree) stays dark. */
+  --sl-color-text-invert: #1a0907;
   --sl-color-backdrop-overlay: var(--at-scrim);
 }
 
@@ -83,7 +86,9 @@
   --at-muted: #5d594e;
   --at-faint: #8b8678;
   --at-accent: #c2180f;
+  --at-accent-fill: var(--at-accent);
   --at-on-accent: #fffdf8;
+  --sl-color-text-invert: var(--at-on-accent);
   --at-caution: #8a6100;
   --at-danger: #b3261e;
   --at-scrim: rgb(40 36 24 / 0.4);
@@ -419,7 +424,7 @@ code, pre, kbd, .expressive-code .ec-line { font-variant-ligatures: none; font-f
 .sl-steps > li::before { font-family: var(--sl-font-mono); font-size: 0.75rem; color: var(--at-accent); background: none; box-shadow: inset 0 0 0 1px var(--at-line); }
 .sl-badge { font-family: var(--sl-font-mono); border-radius: 4px; }
 :root .sl-link-button { padding: 0.7rem 1.1rem; border-radius: var(--at-radius); font-size: 0.9375rem; font-weight: 600; }
-:root .sl-link-button.primary { background: var(--at-accent); border-color: var(--at-accent); color: var(--at-on-accent); }
+:root .sl-link-button.primary { background: var(--at-accent-fill); border-color: var(--at-accent-fill); color: var(--at-on-accent); }
 :root .sl-link-button.secondary, :root .sl-link-button.minimal { color: var(--at-fg); }
 :root .sl-link-button.secondary { border-color: var(--at-line); }
 
