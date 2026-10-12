@@ -1,0 +1,632 @@
+/* ==========================================================================
+   Atelier: the look of the youtube.api documentation.
+   Graphite and red, editorial type, hairlines instead of shadows. The same
+   system as the other ix-xs sites, with this project's own accent.
+
+   Motion follows three rules. Anything seen tens of times a day does not move
+   (page changes, hover on navigation, the search palette). What does move uses
+   the curves below and stays under 300 ms. Reduced motion keeps the fades and
+   drops the travel.
+   ========================================================================== */
+
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --at-display: "Bricolage Grotesque Variable", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --at-radius: 6px;
+  /* Icon buttons: the box, the glyph, the space between two, and how far a
+     box at the edge of the page reaches past the glyph. */
+  --at-icon-btn: 2.25rem;
+  --at-icon: 1.125rem;
+  --at-icon-gap: 0.25rem;
+  --at-icon-bleed: calc((var(--at-icon-btn) - var(--at-icon)) / 2);
+
+  /* Starlight */
+  --sl-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --sl-font-mono: "Fragment Mono", ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --sl-nav-height: 3.75rem;
+  --sl-sidebar-width: 17.5rem;
+  --sl-content-width: 46rem;
+  --sl-text-h1: clamp(2.5rem, 6vw, 3.75rem);
+  --sl-text-h2: 1.75rem;
+  --sl-text-h3: 1.25rem;
+  --sl-text-h4: 1.0625rem;
+  --sl-line-height: 1.7;
+  --sl-line-height-headings: 1.15;
+}
+
+:root,
+:root[data-theme="dark"] {
+  --at-bg: #121211;
+  --at-surface: #191917;
+  --at-line: #2b2a26;
+  --at-fg: #edebe4;
+  --at-muted: #a29f95;
+  --at-faint: #726f66;
+  --at-accent: #ff4e45;
+  --at-on-accent: #1a0907;
+  --at-caution: #e0b050;
+  --at-danger: #ff5a52;
+  --at-scrim: rgb(0 0 0 / 0.55);
+
+  --sl-color-accent-low: #3a1311;
+  --sl-color-accent: var(--at-accent);
+  --sl-color-accent-high: #ffb3ad;
+  --sl-color-white: var(--at-fg);
+  --sl-color-gray-1: #dedcd4;
+  --sl-color-gray-2: var(--at-muted);
+  --sl-color-gray-3: var(--at-faint);
+  --sl-color-gray-4: #4b4943;
+  --sl-color-gray-5: var(--at-line);
+  --sl-color-gray-6: var(--at-surface);
+  --sl-color-black: var(--at-bg);
+  --sl-color-bg: var(--at-bg);
+  --sl-color-bg-nav: color-mix(in srgb, var(--at-bg) 80%, transparent);
+  --sl-color-bg-sidebar: var(--at-bg);
+  --sl-color-bg-inline-code: transparent;
+  --sl-color-hairline: var(--at-line);
+  --sl-color-hairline-light: var(--at-line);
+  --sl-color-hairline-shade: var(--at-line);
+  --sl-color-text: var(--at-muted);
+  --sl-color-text-accent: var(--at-accent);
+  --sl-color-text-invert: var(--at-on-accent);
+  --sl-color-backdrop-overlay: var(--at-scrim);
+}
+
+:root[data-theme="light"] {
+  --at-bg: #f8f6f0;
+  --at-surface: #fffdf8;
+  --at-line: #e1ddd0;
+  --at-fg: #1b1a16;
+  --at-muted: #5d594e;
+  --at-faint: #8b8678;
+  --at-accent: #c2180f;
+  --at-on-accent: #fffdf8;
+  --at-caution: #8a6100;
+  --at-danger: #b3261e;
+  --at-scrim: rgb(40 36 24 / 0.4);
+
+  --sl-color-accent-low: #f8dcd8;
+  --sl-color-accent-high: #7d100a;
+  --sl-color-gray-1: #2a2822;
+  --sl-color-gray-4: #b9b3a3;
+  --sl-color-gray-7: var(--at-bg);
+}
+
+/* ------------------------------ Foundations ------------------------------ */
+html {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  scrollbar-color: var(--at-line) transparent;
+}
+body { -webkit-font-smoothing: antialiased; }
+::selection { background: color-mix(in srgb, var(--at-accent) 32%, transparent); color: var(--at-fg); }
+:focus-visible { outline: 2px solid var(--at-accent); outline-offset: 2px; }
+button, a, summary, [role="tab"] { touch-action: manipulation; }
+button, summary, [role="tab"] { user-select: none; -webkit-user-select: none; }
+
+/* Easing the dark/light switch avoids an abrupt jump in brightness. */
+html.theme-anim body, html.theme-anim body * {
+  transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease !important;
+}
+
+/* Press feedback on what behaves like a button. */
+.at-press, .sl-link-button, site-search button[data-open-modal], .sl-menu-button {
+  transition: transform 160ms var(--ease-out);
+}
+.at-press:active, .sl-link-button:active, site-search button[data-open-modal]:active, .sl-menu-button:active, .expressive-code .copy button:active {
+  transform: scale(0.97);
+}
+
+/* --------------------------------- Header -------------------------------- */
+header.header {
+  /* One line for everything: the bar has no vertical padding of its own, so
+     its content is centred on the full height (the safe area aside). */
+  padding-block: env(safe-area-inset-top, 0px) 0;
+  height: calc(var(--sl-nav-height) + env(safe-area-inset-top, 0px));
+  border-bottom: 1px solid var(--at-line);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  backdrop-filter: blur(16px) saturate(160%);
+}
+.at-header { display: flex; align-items: center; gap: 1.25rem; height: 100%; min-width: 0; }
+.at-brand { display: flex; align-items: baseline; gap: 0.5rem; font-family: var(--at-display); font-weight: 700; font-size: 1.25rem; letter-spacing: -0.02em; color: var(--at-fg); text-decoration: none; white-space: nowrap; }
+/* When the row runs out of room (large text on a phone), the version wraps to
+   a second line that is not shown, and the name keeps its place. */
+.at-brand { flex-wrap: wrap; min-width: 0; max-height: 1.7em; overflow: hidden; }
+.at-brand span { flex: none; }
+.at-brand i { font-style: normal; color: var(--at-accent); }
+.at-brand small { font-family: var(--sl-font-mono); font-weight: 400; font-size: 0.6875rem; letter-spacing: 0.04em; color: var(--at-faint); }
+.at-toplinks { display: flex; gap: 1.5rem; margin-inline-start: 1rem; font-size: 0.875rem; }
+.at-toplinks a { color: var(--at-muted); text-decoration: none; }
+.at-toplinks a[aria-current="true"] { color: var(--at-fg); }
+.at-header .at-spacer { flex: 1; }
+/* The icon buttons share one box and one glyph size. The last one reaches into
+   the page margin by `--at-icon-bleed`, so its glyph, not its box, lines up
+   with the edge of the content. */
+.at-header .at-actions { display: flex; align-items: center; gap: var(--at-icon-gap); margin-inline-end: calc(-1 * var(--at-icon-bleed)); }
+.at-icon-btn { display: grid; place-items: center; flex: none; width: var(--at-icon-btn); height: var(--at-icon-btn); padding: 0; border: 0; border-radius: var(--at-radius); background: none; color: var(--at-muted); cursor: pointer; }
+.at-icon-btn svg { width: var(--at-icon); height: var(--at-icon); }
+/* The language switch: two codes, the current one lit. */
+.at-lang { display: flex; align-items: center; margin-inline-end: 0.25rem; font-family: var(--sl-font-mono); font-size: 0.6875rem; letter-spacing: 0.06em; }
+.at-lang a { display: grid; place-items: center; min-width: 1.875rem; height: var(--at-icon-btn); padding-inline: 0.25rem; border-radius: var(--at-radius); color: var(--at-faint); text-decoration: none; -webkit-touch-callout: none; }
+.at-lang a[aria-current="true"] { color: var(--at-fg); }
+/* Links that act as buttons do not offer the link menu on a long press. */
+a.at-icon-btn, .mobile-preferences .social-icons a { -webkit-touch-callout: none; }
+
+.at-header site-search button[data-open-modal] {
+  width: auto;
+  min-width: 15rem;
+  max-width: 100%;
+  height: 2.25rem;
+  border: 1px solid var(--at-line);
+  border-radius: var(--at-radius);
+  background: transparent;
+  color: var(--at-muted);
+  font-size: 0.875rem;
+  box-shadow: none;
+}
+.at-header site-search button[data-open-modal] kbd { background: transparent; border: 0; font-family: var(--sl-font-mono); font-size: 0.6875rem; color: var(--at-faint); }
+site-search dialog { border: 1px solid var(--at-line); border-radius: var(--at-radius); background: var(--at-surface); box-shadow: 0 24px 64px rgb(0 0 0 / 0.4); }
+site-search dialog input { font-size: 1rem; }
+
+/* What the dialog offers before a search: recent pages, starting points and
+   searches to try. Shown while the field is empty, and never animated: the
+   dialog opens from the keyboard, many times a day. */
+.at-suggest { display: grid; gap: 1.5rem; margin-top: 1.25rem; }
+.search-container:has(.pagefind-ui__search-input:not(:placeholder-shown)) .at-suggest { display: none; }
+.at-suggest header { display: flex; align-items: center; justify-content: space-between; min-height: 1.5rem; margin-bottom: 0.25rem; }
+.at-suggest h2 { margin: 0; font-family: var(--sl-font-mono); font-weight: 400; font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--at-faint); }
+.at-suggest ul { margin: 0; padding: 0; list-style: none; }
+.at-suggest li + li { border-top: 1px solid var(--at-line); }
+.at-suggest a { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-inline: -0.625rem; padding: 0.6875rem 0.625rem; border-radius: var(--at-radius); color: var(--at-fg); font-size: 0.9375rem; line-height: 1.4; text-decoration: none; }
+.at-suggest a span { min-width: 0; overflow-wrap: anywhere; }
+.at-suggest a small { flex: none; font-family: var(--sl-font-mono); font-size: 0.6875rem; letter-spacing: 0.04em; color: var(--at-faint); }
+.at-suggest a:focus-visible, .at-queries button:focus-visible { outline: none; background: color-mix(in srgb, var(--at-fg) 7%, transparent); box-shadow: inset 2px 0 0 var(--at-accent); }
+.at-queries { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.at-queries button { padding: 0.4375rem 0.6875rem; border: 1px solid var(--at-line); border-radius: var(--at-radius); background: transparent; color: var(--at-muted); font-family: var(--sl-font-mono); font-size: 0.8125rem; line-height: 1.4; cursor: pointer; }
+.at-suggest [data-at-forget] { margin-inline-end: -0.375rem; padding: 0.25rem 0.375rem; border: 0; border-radius: var(--at-radius); background: none; color: var(--at-muted); font-size: 0.75rem; cursor: pointer; }
+/* Results speak the same language: a tinted row and a red rule for the one
+   that has the focus, instead of a box around a box. */
+site-search .dialog-frame { scrollbar-width: thin; scrollbar-color: var(--at-line) transparent; overscroll-behavior: contain; }
+/* Full screen on a phone: keep the field clear of the notch and the home indicator. */
+@media (max-width: 49.99rem) {
+  site-search .dialog-frame { padding-block: calc(1rem + env(safe-area-inset-top, 0px)) calc(1rem + env(safe-area-inset-bottom, 0px)); }
+}
+/* A finger needs more room than a pointer. */
+@media (pointer: coarse) {
+  .at-suggest a { padding-block: 0.75rem; }
+  .at-queries button { padding: 0.6875rem 0.875rem; }
+  .at-suggest [data-at-forget] { padding: 0.625rem 0.75rem; margin-inline-end: -0.75rem; }
+}
+#starlight__search input:focus-visible, #starlight__search .pagefind-ui__result-link:focus-visible, #starlight__search .pagefind-ui__result-nested a:focus-visible { outline: none; }
+#starlight__search .pagefind-ui__message { height: auto; padding: 0; margin-block: 1.25rem 0.75rem; font-family: var(--sl-font-mono); font-weight: 400; font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--at-faint); }
+#starlight__search .pagefind-ui__result-title:not(:where(.pagefind-ui__result-nested *)):is(:hover, :focus-within),
+#starlight__search .pagefind-ui__result-nested:is(:hover, :focus-within) { outline: none; }
+#starlight__search .pagefind-ui__result-title:not(:where(.pagefind-ui__result-nested *)):focus-within,
+#starlight__search .pagefind-ui__result-nested:focus-within { background: color-mix(in srgb, var(--at-fg) 7%, var(--at-bg)); box-shadow: inset 2px 0 0 var(--at-accent); }
+#starlight__search .pagefind-ui__result-title { font-family: var(--at-display); letter-spacing: -0.01em; }
+#starlight__search mark { background: none; color: var(--at-accent); font-weight: 600; }
+/* The keys that work here, for readers who have a keyboard. */
+.at-search-keys { display: none; }
+@media (min-width: 50rem) and (hover: hover) and (pointer: fine) {
+  .at-search-keys { position: sticky; bottom: -1.5rem; z-index: 1; display: flex; gap: 1.25rem; margin: auto -1.5rem -1.5rem; background: var(--at-surface); padding: 0.625rem 1.5rem; border-top: 1px solid var(--at-line); font-family: var(--sl-font-mono); font-size: 0.6875rem; letter-spacing: 0.04em; color: var(--at-faint); }
+  .at-search-keys span { display: flex; align-items: center; gap: 0.375rem; }
+  .at-search-keys kbd { display: grid; place-items: center; min-width: 1.25rem; height: 1.25rem; padding-inline: 0.25rem; border: 1px solid var(--at-line); border-radius: 4px; font-family: inherit; font-size: 0.6875rem; color: var(--at-muted); }
+}
+
+@media (max-width: 49.99rem) {
+  :root { --at-icon-btn: 2.75rem; --at-icon-gap: 0rem; }
+  .at-toplinks, .at-header .at-actions { display: none; }
+  /* In the header of a small screen there is room for one code: the other language. */
+  .at-header .at-lang a[aria-current="true"] { display: none; }
+  .at-header .at-lang { margin-inline-end: 0; }
+  .at-header .at-lang a { min-width: var(--at-icon-btn); font-size: 0.75rem; color: var(--at-muted); }
+  .at-header { gap: var(--at-icon-gap); }
+  /* Search becomes one more icon button, in the same box as its neighbours. */
+  .at-header site-search button[data-open-modal] { display: grid; place-items: center; flex: none; min-width: 0; width: var(--at-icon-btn); height: var(--at-icon-btn); padding: 0; border: 0; }
+  .at-header site-search button[data-open-modal] > svg { width: var(--at-icon); height: var(--at-icon); }
+  /* With a navigation sheet, the menu button is the last of the row: keep its place free. */
+  [data-has-sidebar] header.header { padding-inline-end: calc(var(--sl-nav-pad-x) - var(--at-icon-bleed) + var(--at-icon-btn) + var(--at-icon-gap)); }
+}
+
+/* -------------------------------- Sidebar -------------------------------- */
+.sidebar-pane { border-inline-end: 1px solid var(--at-line); scrollbar-width: thin; scrollbar-color: var(--at-line) transparent; }
+.sidebar-content { padding: 2rem 1rem 3rem 1.5rem; gap: 0; }
+.sidebar-content ul.top-level { counter-reset: at-group; }
+.sidebar-content ul.top-level > li { counter-increment: at-group; margin-top: 0; }
+.sidebar-content ul.top-level > li + li { margin-top: 1.5rem; }
+.sidebar-content ul.top-level > li > details > summary { padding: 0.125rem 0; }
+.sidebar-content ul.top-level > li > details > summary .group-label { display: flex; align-items: baseline; gap: 0.5rem; min-width: 0; }
+.sidebar-content ul.top-level > li > details > summary .group-label::before {
+  content: counter(at-group, decimal-leading-zero);
+  font-family: var(--sl-font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  color: var(--at-accent);
+}
+.sidebar-content .large, .sidebar-content summary .large {
+  font-family: var(--at-display);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  letter-spacing: -0.005em;
+  color: var(--at-fg);
+  overflow-wrap: anywhere;
+}
+.sidebar-content summary { border-radius: 4px; }
+.sidebar-content summary .caret { width: 0.875rem; height: 0.875rem; opacity: 0.55; }
+.sidebar-content details > ul { margin: 0.5rem 0 0 0.3rem; padding: 0; border-inline-start: 1px solid var(--at-line); }
+.sidebar-content details > ul > li { margin: 0; padding: 0; border: 0; }
+.sidebar-content details > ul a {
+  display: block;
+  margin-inline-start: -1px;
+  padding: 0.3rem 0 0.3rem 1.1rem;
+  border-inline-start: 1px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--at-muted);
+  font-size: 0.9rem;
+  font-weight: 400;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.sidebar-content details > ul a[aria-current="page"] { border-inline-start-color: var(--at-accent); background: none; color: var(--at-fg); font-weight: 600; }
+/* A group inside a group (the tutorial inside Start). */
+.sidebar-content details details > summary { padding: 0.3rem 0 0.3rem 1.1rem; }
+.sidebar-content details details > summary .large { font-family: var(--sl-font); font-weight: 400; font-size: 0.9rem; color: var(--at-muted); }
+.sidebar-content details details > ul { margin: 0.125rem 0 0.25rem 1.4rem; }
+.mobile-preferences { border-top: 1px solid var(--at-line); }
+
+/* ------------------------------ Page title ------------------------------- */
+.at-eyebrow { margin: 0; font-family: var(--sl-font-mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--at-accent); overflow-wrap: anywhere; }
+.at-title {
+  margin: 0.75rem 0 0;
+  font-family: var(--at-display);
+  font-weight: 700;
+  font-size: var(--sl-text-h1);
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  font-optical-sizing: auto;
+  color: var(--at-fg);
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+.at-lead { margin: 1.5rem 0 0; max-width: 38rem; font-size: 1.1875rem; line-height: 1.55; color: var(--at-muted); }
+.main-pane .content-panel { border: 0; }
+.main-pane .content-panel:first-of-type { padding-top: 4rem; padding-bottom: 0; }
+@media (max-width: 49.99rem) {
+  .main-pane .content-panel:first-of-type { padding-top: 2.5rem; }
+  .at-title { font-size: clamp(2rem, 10vw, 2.5rem); }
+}
+
+/* ------------------------------- Prose ----------------------------------- */
+.sl-markdown-content { counter-reset: at-section; }
+.sl-markdown-content :is(h1, h2, h3, h4, h5, h6) { font-family: var(--at-display); color: var(--at-fg); overflow-wrap: anywhere; }
+.sl-markdown-content h2 { font-weight: 650; font-size: var(--sl-text-h2); line-height: 1.15; letter-spacing: -0.02em; }
+.sl-markdown-content h3 { font-weight: 650; font-size: var(--sl-text-h3); line-height: 1.25; letter-spacing: -0.012em; }
+.sl-markdown-content h4 { font-weight: 650; font-size: var(--sl-text-h4); letter-spacing: -0.005em; }
+.sl-markdown-content :is(h2, h3, h4) code { font-size: 0.86em; font-weight: 400; letter-spacing: 0; }
+
+/* Numbered sections, on documentation pages only. Starlight wraps a heading
+   with its anchor link: the rule and the count belong to that wrapper. */
+[data-has-sidebar] .sl-markdown-content > .sl-heading-wrapper.level-h2 {
+  counter-increment: at-section;
+  margin-top: 4.5rem;
+  padding-top: 1.5rem;
+  padding-inline-start: 2.25rem;
+  text-indent: -2.25rem;
+  border-top: 1px solid var(--at-line);
+}
+[data-has-sidebar] .sl-markdown-content > .sl-heading-wrapper.level-h2:first-child { margin-top: 3.5rem; }
+[data-has-sidebar] .sl-markdown-content > .sl-heading-wrapper.level-h2 > h2::before {
+  content: counter(at-section, decimal-leading-zero);
+  display: inline-block;
+  width: 2.25rem;
+  text-indent: 0;
+  font-family: var(--sl-font-mono);
+  font-weight: 400;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  color: var(--at-accent);
+  vertical-align: 0.3em;
+}
+/* The wrapper sets the line: it needs the face of the heading it holds, or
+   the two disagree on where the baseline is and the line grows. */
+.sl-markdown-content .sl-heading-wrapper { font-family: var(--at-display); }
+.sl-markdown-content .sl-heading-wrapper.level-h3 { line-height: 1.25; }
+:root .sl-markdown-content a.sl-anchor-link { color: var(--at-faint); text-decoration: none; text-indent: 0; }
+
+/* Prose only: what a component draws inside `.not-content` (the playground
+   of the landing page) has colours of its own. */
+.sl-markdown-content :is(p, li, dd):not(:where(.not-content *)) { color: var(--at-muted); }
+.sl-markdown-content :is(strong, b, dt):not(:where(.not-content *)) { color: var(--at-fg); font-weight: 600; }
+.sl-markdown-content a:not(.sl-link-button, .sl-link-card a, :where(.not-content *)) { color: var(--at-fg); text-decoration: underline; text-decoration-color: var(--at-accent); text-decoration-thickness: 1px; text-underline-offset: 0.2em; }
+.sl-markdown-content code:not(:where(.expressive-code *, .not-content *)) { padding: 0; background: none; font-size: 0.875em; color: var(--at-fg); overflow-wrap: anywhere; }
+/* The margins that blocks set for themselves are for when they open a
+   container. After another block, the gap is the one of running text. */
+.sl-markdown-content :not(a, strong, em, del, span, input, code, br) + :is(.expressive-code, .starlight-aside, .at-table, .dc, hr):not(:where(.not-content *)) { margin-top: var(--sl-content-gap-y); }
+.sl-markdown-content hr { border: 0; border-top: 1px solid var(--at-line); margin-block: 3rem; }
+.sl-markdown-content blockquote { border-inline-start: 2px solid var(--at-line); color: var(--at-muted); }
+.sl-markdown-content kbd { font-family: var(--sl-font-mono); font-size: 0.75em; padding: 0.1em 0.4em; border: 1px solid var(--at-line); border-radius: 4px; color: var(--at-fg); }
+
+/* -------------------------------- Tables --------------------------------- */
+/* A table keeps its shape and scrolls sideways on a phone; the edge shadow says so. */
+.at-table {
+  margin-top: 1.5rem;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--at-line) transparent;
+  background:
+    linear-gradient(to right, var(--at-bg) 40%, transparent) left / 2.5rem 100% no-repeat local,
+    linear-gradient(to left, var(--at-bg) 40%, transparent) right / 2.5rem 100% no-repeat local,
+    linear-gradient(to right, rgb(0 0 0 / 0.22), transparent) left / 0.75rem 100% no-repeat scroll,
+    linear-gradient(to left, rgb(0 0 0 / 0.22), transparent) right / 0.75rem 100% no-repeat scroll;
+}
+.sl-markdown-content .at-table table { display: table; width: 100%; min-width: 34rem; margin: 0; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.sl-markdown-content :is(th, td) { background: none; border: 0; }
+.sl-markdown-content th { padding: 0 1.25rem 0.6rem 0; font-family: var(--sl-font-mono); font-weight: 400; font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; text-align: start; white-space: nowrap; color: var(--at-faint); border-bottom: 1px solid var(--at-fg); }
+.sl-markdown-content td { padding: 0.85rem 1.25rem 0.85rem 0; vertical-align: top; font-size: 0.9375rem; color: var(--at-muted); border-bottom: 1px solid var(--at-line); }
+.sl-markdown-content td:first-child { min-width: 8rem; }
+.sl-markdown-content td:last-child { min-width: 14rem; padding-inline-end: 0; }
+.sl-markdown-content th:last-child { padding-inline-end: 0; }
+.sl-markdown-content tr:nth-child(2n):not(:where(.not-content *)) { background: none; }
+
+/* -------------------------------- Asides --------------------------------- */
+.starlight-aside {
+  /* The accent is red here, so a plain note takes a neutral rule and red stays for danger. */
+  --at-aside: var(--at-muted);
+  margin-top: 1.75rem;
+  padding: 0.25rem 0 0.25rem 1.25rem;
+  border: 0;
+  border-inline-start: 2px solid var(--at-aside);
+  border-radius: 0;
+  background: none;
+  color: var(--at-muted);
+}
+.starlight-aside--caution { --at-aside: var(--at-caution); }
+.starlight-aside--danger { --at-aside: var(--at-danger); }
+.starlight-aside__title { font-family: var(--at-display); font-weight: 650; font-size: 1rem; color: var(--at-fg); gap: 0.5rem; }
+.starlight-aside__icon { display: none; }
+.starlight-aside__content { font-size: 0.9375rem; }
+
+/* --------------------------------- Tabs ---------------------------------- */
+:root starlight-tabs .tablist-wrapper { border-bottom: 1px solid var(--at-line); scrollbar-width: none; }
+:root starlight-tabs [role="tablist"] { position: relative; border: 0; }
+:root starlight-tabs .tab { margin-bottom: -2px; }
+:root starlight-tabs [role="tab"] { padding: 0.75rem 0.9rem; border: 0; box-shadow: none; line-height: var(--sl-line-height); text-decoration: none; font-family: var(--sl-font-mono); font-size: 0.75rem; font-weight: 400; color: var(--at-faint); }
+:root starlight-tabs [role="tab"][aria-selected="true"] { color: var(--at-fg); font-weight: 400; border: 0; box-shadow: inset 0 -2px 0 var(--at-accent); }
+:root starlight-tabs[data-at-indicator] [role="tab"][aria-selected="true"] { box-shadow: none; }
+.at-tab-indicator { position: absolute; left: 0; bottom: 0; width: 100px; height: 2px; background: var(--at-accent); transform-origin: left center; pointer-events: none; }
+[data-at-ready] > .at-tab-indicator { transition: transform 250ms var(--ease-in-out); }
+
+/* ------------------------------ Code blocks ------------------------------ */
+.expressive-code { margin-top: 1.75rem; }
+.expressive-code .frame { box-shadow: none; }
+.expressive-code .frame.is-terminal .header::before { display: none; }
+.expressive-code pre { scrollbar-width: thin; scrollbar-color: var(--at-line) transparent; }
+/* Code is read character by character: no ligatures. */
+code, pre, kbd, .expressive-code .ec-line { font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
+
+/* --------------------------- Cards, steps, misc -------------------------- */
+.card { border: 1px solid var(--at-line); border-radius: var(--at-radius); background: var(--at-surface); }
+.card .title { font-family: var(--at-display); font-weight: 650; color: var(--at-fg); }
+.card .icon { border: 0; background: none; color: var(--at-accent); padding: 0; }
+.sl-link-card { border: 0; border-top: 1px solid var(--at-line); border-radius: 0; box-shadow: none; padding: 1rem 0; }
+.sl-link-card .title { font-family: var(--at-display); font-weight: 650; font-size: 1.0625rem; color: var(--at-fg); }
+.sl-link-card .description { color: var(--at-muted); }
+.sl-link-card svg { color: var(--at-accent); }
+.sl-steps > li::before { font-family: var(--sl-font-mono); font-size: 0.75rem; color: var(--at-accent); background: none; box-shadow: inset 0 0 0 1px var(--at-line); }
+.sl-badge { font-family: var(--sl-font-mono); border-radius: 4px; }
+:root .sl-link-button { padding: 0.7rem 1.1rem; border-radius: var(--at-radius); font-size: 0.9375rem; font-weight: 600; }
+:root .sl-link-button.primary { background: var(--at-accent); border-color: var(--at-accent); color: var(--at-on-accent); }
+:root .sl-link-button.secondary, :root .sl-link-button.minimal { color: var(--at-fg); }
+:root .sl-link-button.secondary { border-color: var(--at-line); }
+
+/* --------------------------- On this page (right) ------------------------ */
+.right-sidebar { border: 0; }
+.right-sidebar-panel { padding-top: 4.5rem; }
+.right-sidebar-panel h2 { font-family: var(--sl-font-mono); font-weight: 400; font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--at-faint); }
+.right-sidebar starlight-toc ul { padding: 0; }
+.right-sidebar starlight-toc a { display: flex; gap: 0.6rem; padding: 0.25rem 0; --pad-inline: 0rem; border-radius: 0; color: var(--at-muted); font-size: 0.875rem; overflow-wrap: anywhere; }
+.right-sidebar starlight-toc a::before { content: ""; flex-shrink: 0; width: 0.75rem; height: 1px; margin-top: 0.75em; background: var(--at-line); }
+.right-sidebar starlight-toc ul ul a { padding-inline-start: 2.1rem; font-size: 0.8125rem; }
+.right-sidebar starlight-toc ul ul a::before { display: none; }
+.right-sidebar starlight-toc a[aria-current="true"] { color: var(--at-fg); }
+.right-sidebar starlight-toc a[aria-current="true"]::before { background: var(--at-accent); }
+mobile-.right-sidebar starlight-toc nav { border-bottom: 1px solid var(--at-line); }
+
+/* ------------------------------ Page footer ------------------------------ */
+.pagination-links { gap: 1rem; margin-top: 2rem; border-top: 1px solid var(--at-fg); }
+.pagination-links a { padding: 1.25rem 0; border: 0; border-radius: 0; box-shadow: none; color: var(--at-muted); font-size: 0.8125rem; overflow-wrap: anywhere; }
+.pagination-links a svg { display: none; }
+.pagination-links .link-title { margin-top: 0.15rem; font-family: var(--at-display); font-weight: 650; font-size: 1.25rem; line-height: 1.2; letter-spacing: -0.015em; color: var(--at-fg); }
+footer .meta { font-size: 0.8125rem; color: var(--at-faint); }
+
+/* ------------------------------- Landing --------------------------------- */
+/* minmax(0, 1fr): a grid track otherwise grows to its widest line of code. */
+.at-landing { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6rem; padding-block: 1rem 6rem; }
+/* The opening: one centred column, and nothing next to it. */
+.at-hero { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; padding-block: clamp(1.5rem, 7vh, 5rem) clamp(0rem, 3vh, 2rem); text-align: center; }
+/* Each line settles in turn; the title also comes into focus. */
+.at-hero > * { opacity: 0; transform: translateY(10px); animation: at-rise 500ms var(--ease-out) forwards; }
+.at-hero > :nth-child(2) { animation-name: at-focus; animation-duration: 700ms; animation-delay: 60ms; }
+.at-hero > :nth-child(3) { animation-delay: 160ms; }
+.at-hero > :nth-child(4) { animation-delay: 230ms; }
+.at-hero > :nth-child(5) { animation-delay: 300ms; }
+.at-hero > :nth-child(6) { animation-delay: 370ms; }
+@keyframes at-rise { to { opacity: 1; transform: none; } }
+@keyframes at-focus { from { opacity: 0; transform: translateY(14px); filter: blur(10px); } to { opacity: 1; transform: none; filter: none; } }
+.at-hero h1 { max-width: 14ch; text-wrap: balance; overflow-wrap: anywhere; margin: 1.25rem 0 0; font-family: var(--at-display); font-weight: 750; font-size: clamp(2.75rem, 9.5vw, 6.5rem); line-height: 0.96; letter-spacing: -0.04em; font-optical-sizing: auto; color: var(--at-fg); }
+.at-hero h1 em { font-style: normal; color: var(--at-accent); }
+.at-hero .at-lead { max-width: 39rem; margin-top: 1.75rem; text-wrap: pretty; }
+.at-hero-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.75rem 1.25rem; margin-top: 1.75rem; }
+.at-facts { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.375rem 1.5rem; margin: 2.5rem 0 0; padding: 0; list-style: none; font-family: var(--sl-font-mono); font-size: 0.6875rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--at-faint); }
+.at-facts li + li::before { content: "/"; margin-inline-end: 1.5rem; color: var(--at-line); }
+.at-install { display: flex; align-items: center; gap: 0.75rem; margin-top: 2.25rem; text-align: start; padding: 0.75rem 0.75rem 0.75rem 1rem; max-width: 100%; border: 1px solid var(--at-line); border-radius: var(--at-radius); background: var(--at-surface); font-family: var(--sl-font-mono); font-size: 0.8125rem; color: var(--at-fg); }
+.at-install code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; scrollbar-width: none; background: none; padding: 0; }
+.at-install code::before { content: "$ "; color: var(--at-faint); }
+.at-copy { position: relative; flex-shrink: 0; width: 2rem; height: 2rem; border: 0; border-radius: 4px; background: none; color: var(--at-faint); cursor: pointer; }
+.at-copy span { position: absolute; inset: 0; display: grid; place-items: center; transition: opacity 200ms ease, filter 200ms ease; }
+.at-copy .at-copy-done { opacity: 0; filter: blur(2px); }
+.at-copy[data-copied] .at-copy-idle { opacity: 0; filter: blur(2px); }
+.at-copy[data-copied] .at-copy-done { opacity: 1; filter: none; }
+
+/* Sections come into view once, as they are reached. Only when scripts run
+   (they are what brings them in) and when motion is welcome. */
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+  [data-reveal] { transition: opacity 600ms var(--ease-out), transform 600ms var(--ease-out); }
+  [data-reveal]:not([data-revealed]) { opacity: 0; transform: translateY(16px); }
+  :is(.at-points, .at-paths) li:nth-child(2) { transition-delay: 60ms; }
+  :is(.at-points, .at-paths) li:nth-child(3) { transition-delay: 120ms; }
+  :is(.at-points, .at-paths) li:nth-child(4) { transition-delay: 180ms; }
+  :is(.at-points, .at-paths) li:nth-child(5) { transition-delay: 240ms; }
+  :is(.at-points, .at-paths) li:nth-child(6) { transition-delay: 300ms; }
+}
+
+.at-section { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--at-line); }
+.at-section > header { display: flex; align-items: baseline; gap: 1rem; }
+.at-section > header span { font-family: var(--sl-font-mono); font-size: 0.75rem; letter-spacing: 0.06em; color: var(--at-accent); }
+.at-section > header h2 { margin: 0; font-family: var(--at-display); font-weight: 650; font-size: clamp(1.75rem, 4vw, 2.5rem); line-height: 1.08; letter-spacing: -0.03em; color: var(--at-fg); }
+.at-section > p { margin: -1rem 0 0; max-width: 40rem; color: var(--at-muted); }
+.at-points { display: grid; gap: 0 3rem; margin: 0; padding: 0; list-style: none; }
+.at-points li { padding: 1.25rem 0; border-top: 1px solid var(--at-line); }
+.at-points li:first-child { border-top: 0; padding-top: 0; }
+.at-points h3 { margin: 0; font-family: var(--at-display); font-weight: 650; font-size: 1.1875rem; letter-spacing: -0.012em; color: var(--at-fg); }
+.at-points p { margin: 0.35rem 0 0; color: var(--at-muted); font-size: 0.9375rem; line-height: 1.6; }
+.at-points code { font-size: 0.875em; color: var(--at-fg); background: none; padding: 0; }
+@media (min-width: 50rem) {
+  .at-points { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .at-points li:nth-child(2) { border-top: 0; padding-top: 0; }
+}
+.at-paths { display: grid; gap: 0 3rem; margin: 0; padding: 0; list-style: none; }
+.at-paths a { display: grid; grid-template-columns: 2.25rem minmax(0, 1fr); align-items: baseline; padding: 1.1rem 0; border-top: 1px solid var(--at-line); color: inherit; text-decoration: none; }
+.at-paths a > span { font-family: var(--sl-font-mono); font-size: 0.75rem; color: var(--at-faint); }
+.at-paths strong { display: block; font-family: var(--at-display); font-weight: 650; font-size: 1.1875rem; letter-spacing: -0.012em; color: var(--at-fg); }
+.at-paths small { display: block; margin-top: 0.2rem; font-size: 0.9375rem; color: var(--at-muted); }
+/* A long single word ("Authentication") with enlarged text breaks instead of widening the page. */
+.at-paths strong, .at-points h3, .at-section > header h2 { overflow-wrap: anywhere; }
+@media (min-width: 50rem) { .at-paths { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ----------------------------- Small screens ----------------------------- */
+/* The navigation sheet: a short fade and settle from under the header, gone faster than it came. */
+@media (max-width: 49.99rem) {
+  /* The sheet is a popover: `display` and `overlay` wait for the fade on the way out. */
+  .sidebar-pane {
+    inset-block-start: calc(var(--sl-nav-height) + env(safe-area-inset-top, 0px));
+    opacity: 0;
+    transform: translateY(-0.5rem);
+    transition: opacity 150ms var(--ease-out), transform 150ms var(--ease-out), display 150ms allow-discrete, overlay 150ms allow-discrete;
+    border-inline-end: 0;
+    background: var(--at-bg);
+    overscroll-behavior: contain;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .sidebar-pane:popover-open { opacity: 1; transform: none; transition-duration: 250ms; }
+  @starting-style {
+    .sidebar-pane:popover-open { opacity: 0; transform: translateY(-0.5rem); }
+  }
+  .sidebar-content { padding: 1.5rem 1.25rem 2rem; }
+}
+
+/* --------------------------- Pointer and motion -------------------------- */
+@media (hover: hover) and (pointer: fine) {
+  .at-toplinks a, .sidebar-content details > ul a, .sidebar-content summary .large, .right-sidebar starlight-toc a, .at-icon-btn, starlight-tabs [role="tab"], .at-copy { transition: color 150ms ease; }
+  .at-lang a { transition: color 150ms ease; }
+  .at-lang a:hover { color: var(--at-fg); }
+  .at-toplinks a:hover, .sidebar-content details > ul a:hover, .sidebar-content details details > summary:hover .large, .right-sidebar starlight-toc a:hover, .at-icon-btn:hover, starlight-tabs [role="tab"]:hover, .at-copy:hover, site-search button[data-open-modal]:hover { color: var(--at-fg); }
+  .sidebar-content details > ul a:hover, .sidebar-content summary:hover { background: none; }
+  .pagination-links a:hover { border: 0; }
+  .at-suggest a:hover { background: color-mix(in srgb, var(--at-fg) 7%, transparent); }
+  #starlight__search .pagefind-ui__result-title:not(:where(.pagefind-ui__result-nested *)):hover, #starlight__search .pagefind-ui__result-nested:hover { background: color-mix(in srgb, var(--at-fg) 7%, var(--at-bg)); }
+  /* The press feedback of .at-press stays in the list: a later `transition` replaces it whole. */
+  .at-queries button { transition: transform 160ms var(--ease-out), color 150ms ease, border-color 150ms ease; }
+  .at-suggest [data-at-forget] { transition: color 150ms ease; }
+  .at-queries button:hover { border-color: var(--at-faint); color: var(--at-fg); }
+  .at-suggest [data-at-forget]:hover { color: var(--at-fg); }
+  .pagination-links a:hover .link-title, .at-paths a:hover strong, .sl-link-card:hover .title { color: var(--at-accent); }
+  .pagination-links .link-title, .at-paths strong, .sl-link-card .title { transition: color 150ms ease; }
+  .sl-link-card:hover { border-color: var(--at-line); background: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .at-press, .sl-link-button, site-search button[data-open-modal], .sl-menu-button { transition: none; }
+  .at-press:active, .sl-link-button:active, site-search button[data-open-modal]:active, .sl-menu-button:active, .expressive-code .copy button:active { transform: none; }
+  [data-at-ready] > .at-tab-indicator { transition: none; }
+  .at-hero > * { transform: none; filter: none; animation: at-fade 200ms ease forwards; animation-delay: 0ms; }
+  @media (max-width: 49.99rem) {
+    .sidebar-pane, .sidebar-pane:popover-open { transform: none; }
+    @starting-style {
+      .sidebar-pane:popover-open { transform: none; }
+    }
+  }
+}
+@keyframes at-fade { to { opacity: 1; } }
+
+@media (prefers-reduced-transparency: reduce) {
+  header.header { background: var(--at-bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+@media (prefers-contrast: more) {
+  :root, :root[data-theme="dark"] { --at-line: #5a5850; --at-muted: #cfccc2; --at-faint: #a29f95; }
+  :root[data-theme="light"] { --at-line: #8b8678; --at-muted: #3a372f; --at-faint: #5d594e; }
+  header.header { background: var(--at-bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+/* ------------------------- Small-screen menu button ---------------------- */
+/* Starlight fixes this button over the header, outside of it. It gets the box
+   of the other icon buttons and sits on their line. No `display` here: the
+   button is hidden on wide screens by Starlight, and a value would undo that. */
+.sl-menu-button {
+  /* The header's hairline is part of its height: centre on what is above it. */
+  top: calc(env(safe-area-inset-top, 0px) + (var(--sl-nav-height) - 1px - var(--at-icon-btn)) / 2);
+  inset-inline-end: calc(var(--sl-nav-pad-x) - var(--at-icon-bleed));
+  align-items: center;
+  justify-content: center;
+  width: var(--at-icon-btn);
+  height: var(--at-icon-btn);
+  padding: 0;
+  border: 0;
+  border-radius: var(--at-radius);
+  background: transparent;
+  box-shadow: none;
+  color: var(--at-muted);
+  font-size: var(--at-icon);
+}
+.sl-menu-button:has(~ :popover-open) { background: var(--at-surface); color: var(--at-fg); box-shadow: none; }
+/* The foot of the navigation sheet: the icon buttons of the header, side by side. */
+.mobile-preferences { justify-content: flex-start; align-items: center; gap: var(--at-icon-gap); margin-inline-start: calc(-1 * var(--at-icon-bleed)); padding: 0.75rem 0; border-top: 1px solid var(--at-line); }
+.mobile-preferences .social-icons { gap: var(--at-icon-gap); margin: 0; padding: 0; }
+.mobile-preferences .social-icons a { align-items: center; justify-content: center; width: var(--at-icon-btn); height: var(--at-icon-btn); margin: 0; padding: 0; border-radius: var(--at-radius); color: var(--at-muted); font-size: var(--at-icon); }
+mobile-starlight-toc summary { font-size: 0.875rem; }
+mobile-starlight-toc .toggle { border-color: var(--at-line); border-radius: var(--at-radius); background: transparent; }
+
+/* ---------------------- Starlight's own motion, retuned ------------------ */
+/* Opening a navigation group happens all day: the caret does not animate. */
+.sidebar-content .caret { transition: none; }
+/* Jumping to a heading is navigation, often from the keyboard: no smooth scroll. */
+html { scroll-behavior: auto; }
+/* The copy button keeps its own fade and gains press feedback. */
+.expressive-code .copy button { transition: transform 160ms var(--ease-out), opacity 200ms ease, background 200ms ease, border-color 200ms ease; }
+@media (prefers-reduced-motion: no-preference) {
+  .sl-markdown-content summary:not(:where(.not-content *))::before { transition: transform 200ms var(--ease-in-out); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .expressive-code .copy button { transition: opacity 200ms ease, background 200ms ease, border-color 200ms ease; }
+}
+
+/* The landing page has no navigation sheet: keep the repository link and the
+   theme switch in its header on small screens. */
+@media (max-width: 49.99rem) {
+  :root:not([data-has-sidebar]) .at-header .at-actions { display: flex; }
+}
+/* Text set very large, or a page zoomed far in: the name of the site matters
+   more than the repository link, which stays in the menu of every other page. */
+@media (max-width: 18rem) {
+  .at-header .at-actions a.at-icon-btn { display: none; }
+}
+
+/* ------------------------------ Last details ----------------------------- */
+:root .starlight-aside__icon { display: none; }
+:root .starlight-aside code { padding: 0; background: none; color: var(--at-fg); }
+/* In a table, code wraps at spaces only: the table scrolls if it has to. */
+.sl-markdown-content .at-table :is(td, th) code { overflow-wrap: normal; }

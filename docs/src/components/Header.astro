@@ -1,0 +1,106 @@
+---
+// The site header: brand, the three top-level areas, search, repository,
+// theme.
+// On small screens only the brand and the search remain; the rest lives in the
+// navigation sheet, which Starlight opens from its own menu button.
+import Search from "virtual:starlight/components/Search";
+import ThemeSelect from "virtual:starlight/components/ThemeSelect";
+import SearchExtras from "./SearchExtras.astro";
+import { normalizeBase, switchLocale } from "../../plugins/base-links.mjs";
+import { href, useT } from "../i18n";
+import pkg from "../../../package.json";
+
+const { locale } = Astro.locals.starlightRoute;
+const t = useT(locale);
+const base = normalizeBase(import.meta.env.BASE_URL);
+// Where this page is, whatever its language.
+const path = switchLocale(Astro.url.pathname.slice(base.length) || "/", undefined);
+const inRecipes = path.startsWith("/recipes/");
+const inReference = path.startsWith("/reference/") || path.startsWith("/help/");
+
+const areas = [
+  { label: t("nav.docs"), href: "/start/quick-start/", current: !inRecipes && !inReference && path !== "/" },
+  { label: t("nav.recipes"), href: "/recipes/discord-upload-notifier/", current: inRecipes },
+  { label: t("nav.reference"), href: "/reference/methods/", current: inReference },
+];
+// The published minor version, read from the package itself.
+const version = pkg.version.split(".").slice(0, 2).join(".");
+---
+
+<div class="at-header">
+  <a class="at-brand" href={Astro.locals.starlightRoute.siteTitleHref} translate="no">
+    <span>youtube<i>.</i>api</span><small>v{version}</small>
+  </a>
+  <nav class="at-toplinks" aria-label={t("nav.sections")}>
+    {areas.map((area) => (
+      <a href={href(area.href, locale)} aria-current={area.current ? "true" : undefined}>{area.label}</a>
+    ))}
+  </nav>
+  <span class="at-spacer"></span>
+  <Search />
+  <div class="at-actions">
+    <a class="at-icon-btn at-press" href="https://github.com/ix-xs/youtube.api" aria-label={t("nav.github")}>
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.4c.58.1.79-.25.79-.55v-2c-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.56-.29-5.25-1.28-5.25-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.47.11-3.06 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.78 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.77.12 3.06.74.81 1.18 1.84 1.18 3.1 0 4.42-2.7 5.4-5.27 5.68.42.36.78 1.06.78 2.14v3.17c0 .31.21.66.8.55A11.5 11.5 0 0 0 12 .5Z"/></svg>
+    </a>
+    <ThemeSelect />
+  </div>
+</div>
+<SearchExtras />
+
+<script>
+  // Copy buttons outside code blocks (the install line on the landing page).
+  document.addEventListener("click", (event) => {
+    const button = (event.target as Element | null)?.closest<HTMLElement>("[data-copy]");
+    if (!button) return;
+    navigator.clipboard?.writeText(button.dataset.copy ?? "").catch(() => {});
+    button.setAttribute("data-copied", "");
+    window.setTimeout(() => button.removeAttribute("data-copied"), 1600);
+  });
+
+  // Sections of the landing page come into view once, as they are reached
+  // (the styles are under [data-reveal]).
+  const reveals = document.querySelectorAll("[data-reveal]");
+  if (reveals.length > 0) {
+    const watcher = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          entry.target.setAttribute("data-revealed", "");
+          watcher.unobserve(entry.target);
+        }
+      },
+      { rootMargin: "0px 0px -8% 0px" },
+    );
+    for (const element of reveals) watcher.observe(element);
+  }
+
+  // A sliding marker under the selected tab. It slides for a pointer, and jumps
+  // for the keyboard: arrowing through tabs should never wait on an animation.
+  let lastPointer = 0;
+  function place(list: HTMLElement, animate: boolean): void {
+    const active = list.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
+    if (!active || active.offsetWidth === 0) return;
+    let marker = list.querySelector<HTMLElement>(".at-tab-indicator");
+    if (!marker) {
+      marker = document.createElement("li");
+      marker.className = "at-tab-indicator";
+      marker.setAttribute("role", "presentation");
+      list.append(marker);
+      list.closest("starlight-tabs")?.setAttribute("data-at-indicator", "");
+    }
+    if (!animate) list.removeAttribute("data-at-ready");
+    marker.style.transform = `translateX(${active.offsetLeft}px) scaleX(${active.offsetWidth / 100})`;
+    if (!animate) requestAnimationFrame(() => requestAnimationFrame(() => list.setAttribute("data-at-ready", "")));
+  }
+  const lists = [...document.querySelectorAll<HTMLElement>('starlight-tabs [role="tablist"]')];
+  for (const list of lists) {
+    place(list, false);
+    list.addEventListener("pointerdown", () => (lastPointer = performance.now()));
+    new MutationObserver(() => place(list, performance.now() - lastPointer < 600)).observe(list, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["aria-selected"],
+    });
+  }
+  if (lists.length > 0) addEventListener("resize", () => lists.forEach((list) => place(list, false)));
+</script>

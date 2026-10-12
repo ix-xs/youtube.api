@@ -1,0 +1,60 @@
+name: Docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "src/**"
+      - "scripts/api.config.mjs"
+      - "package.json"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      # The samples and the generated pages are checked against the library itself.
+      - run: npm ci
+      - name: Build docs site
+        working-directory: docs
+        # Where the site is served from. Leave both repository variables unset
+        # for GitHub Pages' default URL; set DOCS_SITE and DOCS_BASE (to "/")
+        # under Settings > Variables when moving to a custom domain.
+        env:
+          DOCS_SITE: ${{ vars.DOCS_SITE }}
+          DOCS_BASE: ${{ vars.DOCS_BASE }}
+        run: |
+          npm install
+          node scripts/reference.mjs --check
+          npm run check-samples
+          npm run build
+          npm run check-links
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

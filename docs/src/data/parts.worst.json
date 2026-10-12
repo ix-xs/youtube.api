@@ -1,0 +1,881 @@
+[
+  {
+    "name": "Video",
+    "call": "yt.videos.list",
+    "id": "dQw4w9WgXcQ",
+    "variable": "video",
+    "parts": [
+      {
+        "name": "ageGating",
+        "type": "VideoAgeGating",
+        "always": false,
+        "fields": [
+          {
+            "name": "alcoholContent",
+            "type": "boolean",
+            "optional": true
+          },
+          {
+            "name": "restricted",
+            "type": "boolean",
+            "optional": true
+          },
+          {
+            "name": "videoGameRating",
+            "type": "\"anyone\" | \"m15Plus\" | \"m16Plus\" | \"m17Plus\"",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "brandPartner",
+        "type": "BrandPartner",
+        "always": false,
+        "fields": [
+          {
+            "name": "channelHandle",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "channelId",
+            "type": "string",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "contentDetails",
+        "type": "VideoContentDetails",
+        "always": true,
+        "fields": [
+          {
+            "name": "caption",
+            "type": "\"true\" | \"false\"",
+            "optional": false
+          },
+          {
+            "name": "contentRating",
+            "type": "ContentRating",
+            "optional": true
+          },
+          {
+            "name": "countryRestriction",
+            "type": "AccessPolicy",
+            "optional": true
+          },
+          {
+            "name": "definition",
+            "type": "\"sd\" | \"hd\"",
+            "optional": false
+          },
+          {
+            "name": "dimension",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "duration",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "hasCustomThumbnail",
+            "type": "boolean",
+            "optional": true
+          },
+          {
+            "name": "licensedContent",
+            "type": "boolean",
+            "optional": false
+          },
+          {
+            "name": "projection",
+            "type": "\"rectangular\" | \"360\"",
+            "optional": false
+          },
+          {
+            "name": "regionRestriction",
+            "type": "VideoContentDetailsRegionRestriction",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "fileDetails",
+        "type": "VideoFileDetails",
+        "always": false,
+        "fields": [
+          {
+            "name": "audioStreams",
+            "type": "VideoFileDetailsAudioStream[]",
+            "optional": true
+          },
+          {
+            "name": "bitrateBps",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "container",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "creationTime",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "durationMs",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "fileName",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "fileSize",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "fileType",
+            "type": "\"video\" | \"audio\" | \"image\" | \"archive\" | \"document\" | \"project\" | \"other\"",
+            "optional": true
+          },
+          {
+            "name": "videoStreams",
+            "type": "VideoFileDetailsVideoStream[]",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "liveStreamingDetails",
+        "type": "VideoLiveStreamingDetails",
+        "always": false,
+        "fields": [
+          {
+            "name": "activeLiveChatId",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "actualEndTime",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "actualStartTime",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "concurrentViewers",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "scheduledEndTime",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "scheduledStartTime",
+            "type": "string",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "localizations",
+        "type": "{ ... }",
+        "always": false,
+        "fields": []
+      },
+      {
+        "name": "monetizationDetails",
+        "type": "VideoMonetizationDetails",
+        "always": false,
+        "fields": [
+          {
+            "name": "access",
+            "type": "AccessPolicy",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "paidProductPlacementDetails",
+        "type": "VideoPaidProductPlacementDetails",
+        "always": false,
+        "fields": [
+          {
+            "name": "hasPaidProductPlacement",
+            "type": "boolean",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "player",
+        "type": "VideoPlayer",
+        "always": true,
+        "fields": [
+          {
+            "name": "embedHeight",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "embedHtml",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "embedWidth",
+            "type": "string",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "processingDetails",
+        "type": "VideoProcessingDetails",
+        "always": false,
+        "fields": [
+          {
+            "name": "editorSuggestionsAvailability",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "fileDetailsAvailability",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "processingFailureReason",
+            "type": "\"uploadFailed\" | \"transcodeFailed\" | \"streamingFailed\" | \"other\"",
+            "optional": true
+          },
+          {
+            "name": "processingIssuesAvailability",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "processingProgress",
+            "type": "VideoProcessingDetailsProcessingProgress",
+            "optional": true
+          },
+          {
+            "name": "processingStatus",
+            "type": "\"processing\" | \"succeeded\" | \"failed\" | \"terminated\"",
+            "optional": true
+          },
+          {
+            "name": "tagSuggestionsAvailability",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "thumbnailsAvailability",
+            "type": "string",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "projectDetails",
+        "type": "VideoProjectDetails",
+        "always": false,
+        "fields": []
+      },
+      {
+        "name": "recordingDetails",
+        "type": "VideoRecordingDetails",
+        "always": false,
+        "fields": [
+          {
+            "name": "location",
+            "type": "GeoPoint",
+            "optional": true
+          },
+          {
+            "name": "locationDescription",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "recordingDate",
+            "type": "string",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "snippet",
+        "type": "VideoSnippet",
+        "always": true,
+        "fields": [
+          {
+            "name": "categoryId",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "channelId",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "channelTitle",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "defaultAudioLanguage",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "defaultLanguage",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "liveBroadcastContent",
+            "type": "\"none\" | \"upcoming\" | \"live\" | \"completed\"",
+            "optional": false
+          },
+          {
+            "name": "localized",
+            "type": "VideoLocalization",
+            "optional": false
+          },
+          {
+            "name": "publishedAt",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "tags",
+            "type": "string[]",
+            "optional": true
+          },
+          {
+            "name": "thumbnails",
+            "type": "ThumbnailDetails",
+            "optional": false
+          },
+          {
+            "name": "title",
+            "type": "string",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "statistics",
+        "type": "VideoStatistics",
+        "always": true,
+        "fields": [
+          {
+            "name": "commentCount",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "dislikeCount",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "favoriteCount",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "likeCount",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "viewCount",
+            "type": "string",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "status",
+        "type": "VideoStatus",
+        "always": true,
+        "fields": [
+          {
+            "name": "containsSyntheticMedia",
+            "type": "boolean",
+            "optional": true
+          },
+          {
+            "name": "embeddable",
+            "type": "boolean",
+            "optional": false
+          },
+          {
+            "name": "failureReason",
+            "type": "\"conversion\" | \"invalidFile\" | \"emptyFile\" | \"tooSmall\" | \"codec\" | \"uploadAborted\"",
+            "optional": true
+          },
+          {
+            "name": "license",
+            "type": "\"youtube\" | \"creativeCommon\"",
+            "optional": false
+          },
+          {
+            "name": "madeForKids",
+            "type": "boolean",
+            "optional": false
+          },
+          {
+            "name": "privacyStatus",
+            "type": "\"public\" | \"unlisted\" | \"private\"",
+            "optional": false
+          },
+          {
+            "name": "publicStatsViewable",
+            "type": "boolean",
+            "optional": false
+          },
+          {
+            "name": "publishAt",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "rejectionReason",
+            "type": "\"copyright\" | \"inappropriate\" | \"duplicate\" | \"termsOfUse\" | \"uploaderAccountSuspended\" | \"length\" | \"claim\" | \"uploaderAccountClosed\" | \"trademark\" | \"legal\"",
+            "optional": true
+          },
+          {
+            "name": "selfDeclaredMadeForKids",
+            "type": "boolean",
+            "optional": true
+          },
+          {
+            "name": "uploadStatus",
+            "type": "\"uploaded\" | \"processed\" | \"failed\" | \"rejected\" | \"deleted\"",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "suggestions",
+        "type": "VideoSuggestions",
+        "always": false,
+        "fields": [
+          {
+            "name": "editorSuggestions",
+            "type": "\"videoAutoLevels\" | \"videoStabilize\" | \"videoCrop\" | \"audioQuietAudioSwap\"[]",
+            "optional": true
+          },
+          {
+            "name": "processingErrors",
+            "type": "\"audioFile\" | \"imageFile\" | \"projectFile\" | \"notAVideoFile\" | \"docFile\" | \"archiveFile\" | \"unsupportedSpatialAudioLayout\"[]",
+            "optional": true
+          },
+          {
+            "name": "processingHints",
+            "type": "\"nonStreamableMov\" | \"sendBestQualityVideo\" | \"sphericalVideo\" | \"spatialAudio\" | \"vrVideo\" | \"hdrVideo\"[]",
+            "optional": true
+          },
+          {
+            "name": "processingWarnings",
+            "type": "\"unknownContainer\" | \"unknownVideoCodec\" | \"unknownAudioCodec\" | \"inconsistentResolution\" | \"hasEditlist\" | \"problematicVideoCodec\" | \"problematicAudioCodec\" | \"unsupportedVrStereoMode\" | \"unsupportedSphericalProjectionType\" | \"unsupportedHdrPixelFormat\" | \"unsupportedHdrColorMetadata\" | \"problematicHdrLookupTable\"[]",
+            "optional": true
+          },
+          {
+            "name": "tagSuggestions",
+            "type": "VideoSuggestionsTagSuggestion[]",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "topicDetails",
+        "type": "VideoTopicDetails",
+        "always": false,
+        "fields": [
+          {
+            "name": "relevantTopicIds",
+            "type": "string[]",
+            "optional": true
+          },
+          {
+            "name": "topicCategories",
+            "type": "string[]",
+            "optional": true
+          },
+          {
+            "name": "topicIds",
+            "type": "string[]",
+            "optional": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "LiveChatMessage",
+    "call": "yt.liveChatMessages.list",
+    "id": "KicKGFVDX3g1WEcxT1YyUDZ1Wlo1RlNNOVR0dxILalE0dzlXZ1hjUQ",
+    "variable": "message",
+    "parts": [
+      {
+        "name": "authorDetails",
+        "type": "LiveChatMessageAuthorDetails",
+        "always": true,
+        "fields": [
+          {
+            "name": "channelId",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "channelUrl",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "displayName",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "isChatModerator",
+            "type": "boolean",
+            "optional": false
+          },
+          {
+            "name": "isChatOwner",
+            "type": "boolean",
+            "optional": false
+          },
+          {
+            "name": "isChatSponsor",
+            "type": "boolean",
+            "optional": false
+          },
+          {
+            "name": "isVerified",
+            "type": "boolean",
+            "optional": false
+          },
+          {
+            "name": "profileImageUrl",
+            "type": "string",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "snippet",
+        "type": "LiveChatMessageSnippet",
+        "always": true,
+        "fields": [
+          {
+            "name": "authorChannelId",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "displayMessage",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "fanFundingEventDetails",
+            "type": "LiveChatFanFundingEventDetails",
+            "optional": true
+          },
+          {
+            "name": "giftDetails",
+            "type": "LiveChatGiftDetails",
+            "optional": true
+          },
+          {
+            "name": "giftMembershipReceivedDetails",
+            "type": "LiveChatGiftMembershipReceivedDetails",
+            "optional": true
+          },
+          {
+            "name": "hasDisplayContent",
+            "type": "boolean",
+            "optional": false
+          },
+          {
+            "name": "liveChatId",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "memberMilestoneChatDetails",
+            "type": "LiveChatMemberMilestoneChatDetails",
+            "optional": true
+          },
+          {
+            "name": "membershipGiftingDetails",
+            "type": "LiveChatMembershipGiftingDetails",
+            "optional": true
+          },
+          {
+            "name": "messageDeletedDetails",
+            "type": "LiveChatMessageDeletedDetails",
+            "optional": true
+          },
+          {
+            "name": "messageRetractedDetails",
+            "type": "LiveChatMessageRetractedDetails",
+            "optional": true
+          },
+          {
+            "name": "newSponsorDetails",
+            "type": "LiveChatNewSponsorDetails",
+            "optional": true
+          },
+          {
+            "name": "pollDetails",
+            "type": "LiveChatPollDetails",
+            "optional": true
+          },
+          {
+            "name": "publishedAt",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "superChatDetails",
+            "type": "LiveChatSuperChatDetails",
+            "optional": true
+          },
+          {
+            "name": "superStickerDetails",
+            "type": "LiveChatSuperStickerDetails",
+            "optional": true
+          },
+          {
+            "name": "textMessageDetails",
+            "type": "LiveChatTextMessageDetails",
+            "optional": true
+          },
+          {
+            "name": "type",
+            "type": "\"invalidType\" | \"textMessageEvent\" | \"tombstone\" | \"fanFundingEvent\" | \"chatEndedEvent\" | \"sponsorOnlyModeStartedEvent\" | \"sponsorOnlyModeEndedEvent\" | \"newSponsorEvent\" | \"memberMilestoneChatEvent\" | \"membershipGiftingEvent\" | \"giftMembershipReceivedEvent\" | \"messageDeletedEvent\" | \"messageRetractedEvent\" | \"userBannedEvent\" | \"superChatEvent\" | \"superStickerEvent\" | \"pollEvent\" | \"giftEvent\"",
+            "optional": false
+          },
+          {
+            "name": "userBannedDetails",
+            "type": "LiveChatUserBannedMessageDetails",
+            "optional": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "VideoAbuseReportReason",
+    "call": "yt.videoAbuseReportReasons.list",
+    "id": "V",
+    "variable": "videoAbuseReportReason",
+    "parts": [
+      {
+        "name": "snippet",
+        "type": "VideoAbuseReportReasonSnippet",
+        "always": true,
+        "fields": [
+          {
+            "name": "label",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "secondaryReasons",
+            "type": "VideoAbuseReportSecondaryReason[]",
+            "optional": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "ThirdPartyLink",
+    "call": "yt.thirdPartyLinks.list",
+    "id": "UC_x5XG1OV2P6uZZ5FSM9Ttw",
+    "variable": "thirdPartyLink",
+    "parts": [
+      {
+        "name": "linkingToken",
+        "type": "string",
+        "always": true,
+        "fields": []
+      },
+      {
+        "name": "snippet",
+        "type": "ThirdPartyLinkSnippet",
+        "always": true,
+        "fields": [
+          {
+            "name": "channelToAffiliateProgramLink",
+            "type": "ChannelToAffiliateProgramLinkDetails",
+            "optional": true
+          },
+          {
+            "name": "channelToStoreLink",
+            "type": "ChannelToStoreLinkDetails",
+            "optional": true
+          },
+          {
+            "name": "type",
+            "type": "\"linkUnspecified\" | \"channelToStoreLink\" | \"channelToAffiliateProgramLink\"",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "status",
+        "type": "ThirdPartyLinkStatus",
+        "always": true,
+        "fields": [
+          {
+            "name": "linkStatus",
+            "type": "\"unknown\" | \"failed\" | \"pending\" | \"linked\"",
+            "optional": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "PlaylistItem",
+    "call": "yt.playlistItems.list",
+    "id": "PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf",
+    "variable": "playlistItem",
+    "parts": [
+      {
+        "name": "contentDetails",
+        "type": "PlaylistItemContentDetails",
+        "always": true,
+        "fields": [
+          {
+            "name": "endAt",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "note",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "startAt",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "videoId",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "videoPublishedAt",
+            "type": "string",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "snippet",
+        "type": "PlaylistItemSnippet",
+        "always": true,
+        "fields": [
+          {
+            "name": "channelId",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "channelTitle",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "playlistId",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "position",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "publishedAt",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "resourceId",
+            "type": "ResourceId",
+            "optional": false
+          },
+          {
+            "name": "thumbnails",
+            "type": "ThumbnailDetails",
+            "optional": false
+          },
+          {
+            "name": "title",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "videoOwnerChannelId",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "videoOwnerChannelTitle",
+            "type": "string",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "status",
+        "type": "PlaylistItemStatus",
+        "always": true,
+        "fields": [
+          {
+            "name": "privacyStatus",
+            "type": "\"public\" | \"unlisted\" | \"private\"",
+            "optional": false
+          }
+        ]
+      }
+    ]
+  }
+]

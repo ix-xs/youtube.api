@@ -1,0 +1,344 @@
+[
+  {
+    "name": "Video",
+    "call": "yt.videos.list",
+    "id": "dQw4w9WgXcQ",
+    "variable": "video",
+    "parts": [
+      {
+        "name": "snippet",
+        "type": "VideoSnippet",
+        "always": true,
+        "fields": [
+          {
+            "name": "title",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "publishedAt",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "channelTitle",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "thumbnails",
+            "type": "ThumbnailDetails",
+            "optional": false
+          },
+          {
+            "name": "tags",
+            "type": "string[]",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "contentDetails",
+        "type": "VideoContentDetails",
+        "always": true,
+        "fields": [
+          {
+            "name": "duration",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "definition",
+            "type": "\"sd\" | \"hd\"",
+            "optional": false
+          },
+          {
+            "name": "caption",
+            "type": "\"true\" | \"false\"",
+            "optional": false
+          },
+          {
+            "name": "regionRestriction",
+            "type": "VideoContentDetailsRegionRestriction",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "statistics",
+        "type": "VideoStatistics",
+        "always": true,
+        "fields": [
+          {
+            "name": "viewCount",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "likeCount",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "commentCount",
+            "type": "string",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "status",
+        "type": "VideoStatus",
+        "always": true,
+        "fields": [
+          {
+            "name": "privacyStatus",
+            "type": "\"public\" | \"unlisted\" | \"private\"",
+            "optional": false
+          },
+          {
+            "name": "embeddable",
+            "type": "boolean",
+            "optional": false
+          },
+          {
+            "name": "madeForKids",
+            "type": "boolean",
+            "optional": false
+          },
+          {
+            "name": "publishAt",
+            "type": "string",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "liveStreamingDetails",
+        "type": "VideoLiveStreamingDetails",
+        "always": false,
+        "fields": [
+          {
+            "name": "activeLiveChatId",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "actualStartTime",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "concurrentViewers",
+            "type": "string",
+            "optional": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Channel",
+    "call": "yt.channels.list",
+    "id": "UC_x5XG1OV2P6uZZ5FSM9Ttw",
+    "variable": "channel",
+    "parts": [
+      {
+        "name": "snippet",
+        "type": "ChannelSnippet",
+        "always": true,
+        "fields": [
+          {
+            "name": "title",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "customUrl",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "publishedAt",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "thumbnails",
+            "type": "ThumbnailDetails",
+            "optional": false
+          },
+          {
+            "name": "country",
+            "type": "string",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "statistics",
+        "type": "ChannelStatistics",
+        "always": true,
+        "fields": [
+          {
+            "name": "subscriberCount",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "viewCount",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "videoCount",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "hiddenSubscriberCount",
+            "type": "boolean",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "contentDetails",
+        "type": "ChannelContentDetails",
+        "always": true,
+        "fields": [
+          {
+            "name": "relatedPlaylists",
+            "type": "{ ... }",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "brandingSettings",
+        "type": "ChannelBrandingSettings",
+        "always": true,
+        "fields": [
+          {
+            "name": "channel",
+            "type": "ChannelSettings",
+            "optional": true
+          },
+          {
+            "name": "image",
+            "type": "ImageSettings",
+            "optional": true
+          }
+        ]
+      },
+      {
+        "name": "status",
+        "type": "ChannelStatus",
+        "always": true,
+        "fields": [
+          {
+            "name": "privacyStatus",
+            "type": "\"public\" | \"unlisted\" | \"private\"",
+            "optional": false
+          },
+          {
+            "name": "madeForKids",
+            "type": "boolean",
+            "optional": true
+          },
+          {
+            "name": "longUploadsStatus",
+            "type": "\"longUploadsUnspecified\" | \"allowed\" | ...",
+            "optional": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Playlist",
+    "call": "yt.playlists.list",
+    "id": "PLBCF2DAC6FFB574DE",
+    "variable": "playlist",
+    "parts": [
+      {
+        "name": "snippet",
+        "type": "PlaylistSnippet",
+        "always": true,
+        "fields": [
+          {
+            "name": "title",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "publishedAt",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "channelTitle",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "thumbnails",
+            "type": "ThumbnailDetails",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "contentDetails",
+        "type": "PlaylistContentDetails",
+        "always": true,
+        "fields": [
+          {
+            "name": "itemCount",
+            "type": "number",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "status",
+        "type": "PlaylistStatus",
+        "always": true,
+        "fields": [
+          {
+            "name": "privacyStatus",
+            "type": "\"public\" | \"unlisted\" | \"private\"",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "name": "player",
+        "type": "PlaylistPlayer",
+        "always": true,
+        "fields": [
+          {
+            "name": "embedHtml",
+            "type": "string",
+            "optional": false
+          }
+        ]
+      }
+    ]
+  }
+]

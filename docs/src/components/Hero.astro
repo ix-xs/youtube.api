@@ -1,0 +1,35 @@
+---
+// The landing page's opening: what this is, one line to install it, two ways
+// in. Nothing else: the playground right under it does the showing.
+import { LinkButton } from "@astrojs/starlight/components";
+import { href, useT } from "../i18n";
+
+const { entry, locale } = Astro.locals.starlightRoute;
+const t = useT(locale);
+const { data } = entry;
+const { title = data.title, tagline, actions = [] } = data.hero ?? {};
+const install = "npm i @ix-xs/youtube.api";
+---
+
+<div class="at-hero">
+  <p class="at-eyebrow">{t("hero.eyebrow")}</p>
+  <h1 id="_top" data-page-title set:html={title} />
+  {tagline && <p class="at-lead" set:html={tagline} />}
+  <div class="at-install">
+    <code>{install}</code>
+    <button class="at-copy at-press" type="button" data-copy={install} aria-label={t("hero.copy")}>
+      <span class="at-copy-idle"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V6a2 2 0 0 1 2-2h9"></path></svg></span>
+      <span class="at-copy-done"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"></path></svg></span>
+    </button>
+  </div>
+  {actions.length > 0 && (
+    <div class="at-hero-actions">
+      {actions.map(({ link, text, variant }) => (
+        <LinkButton href={href(link, locale)} variant={variant}>{text}</LinkButton>
+      ))}
+    </div>
+  )}
+  <ul class="at-facts">
+    {t("hero.facts").split("|").map((fact) => <li>{fact}</li>)}
+  </ul>
+</div>

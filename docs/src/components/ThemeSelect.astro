@@ -1,0 +1,71 @@
+---
+// A single button instead of Starlight's three-way select: the site follows the
+// system until the reader picks a side, then remembers it (same storage key as
+// Starlight, so its no-flash loader keeps working).
+import { useT } from "../i18n";
+
+const t = useT(Astro.locals.starlightRoute.locale);
+---
+
+<atelier-theme-toggle>
+  <button class="at-icon-btn at-press" type="button" aria-label={t("nav.theme")}>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4"></circle>
+      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>
+    </svg>
+  </button>
+</atelier-theme-toggle>
+
+<script>
+  const STORAGE_KEY = "starlight-theme";
+  const root = document.documentElement;
+
+  /** Keeps the browser chrome (status bar, address bar) the colour of the page. */
+  function syncChrome(): void {
+    const colour = getComputedStyle(root).getPropertyValue("--at-bg").trim();
+    let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (!meta) {
+      meta = document.createElement("meta");
+      meta.name = "theme-color";
+      document.head.append(meta);
+    }
+    if (colour) meta.content = colour;
+  }
+
+  class AtelierThemeToggle extends HTMLElement {
+    constructor() {
+      super();
+      syncChrome();
+      this.querySelector("button")?.addEventListener("click", () => {
+        const next = root.dataset.theme === "light" ? "dark" : "light";
+        // Ease the swap: an instant jump in brightness is unpleasant at night.
+        root.classList.add("theme-anim");
+        root.dataset.theme = next;
+        try {
+          localStorage.setItem(STORAGE_KEY, next);
+        } catch {
+          // Private mode: the choice lasts for this page only.
+        }
+        window.setTimeout(() => {
+          root.classList.remove("theme-anim");
+          syncChrome();
+        }, 220);
+      });
+    }
+  }
+  customElements.define("atelier-theme-toggle", AtelierThemeToggle);
+
+  // Follow the system for as long as the reader has not chosen.
+  matchMedia("(prefers-color-scheme: light)").addEventListener("change", (event) => {
+    let stored: string | null = null;
+    try {
+      stored = localStorage.getItem(STORAGE_KEY);
+    } catch {
+      // Ignore.
+    }
+    if (!stored) {
+      root.dataset.theme = event.matches ? "light" : "dark";
+      syncChrome();
+    }
+  });
+</script>

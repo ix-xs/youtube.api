@@ -1,0 +1,117 @@
+/* ==========================================================================
+   The interactive pieces of the site: the part picker on the landing page and
+   the quota calculator. Same vocabulary as the rest: hairlines, mono labels,
+   one accent.
+   ========================================================================== */
+
+:root,
+:root[data-theme="dark"] {
+  --pp-keyword: #ff8f87;
+  --pp-string: #a9c49f;
+  --pp-number: #e0b96a;
+  --pp-type: #c9c2ae;
+}
+:root[data-theme="light"] {
+  --pp-keyword: #b3261e;
+  --pp-string: #3c6a39;
+  --pp-number: #8a6100;
+  --pp-type: #4f4a3c;
+}
+
+/* ------------------------------ Part picker ------------------------------ */
+.pp { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
+
+/* Which resource: three plain tabs on a hairline. */
+.pp-tabs { position: relative; display: flex; gap: 0.25rem; border-bottom: 1px solid var(--at-line); overflow-x: auto; scrollbar-width: none; }
+/* With scripts, one marker slides between the tabs instead of each tab
+   carrying its own. It slides for a pointer and jumps for the keyboard, like
+   the tabs of the documentation pages. */
+.pp-marker { position: absolute; left: 0; bottom: 0; width: 100px; height: 2px; background: var(--at-accent); transform-origin: left center; pointer-events: none; transition: transform 250ms var(--ease-in-out); }
+.pp-tabs[data-pp-marker] .pp-tab[aria-selected="true"] { border-bottom-color: transparent; }
+.pp-tab { flex: none; margin-bottom: -1px; padding: 0.75rem 0.9rem; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--at-faint); font-family: var(--sl-font-mono); font-size: 0.75rem; letter-spacing: 0.02em; cursor: pointer; }
+.pp-tab[aria-selected="true"] { color: var(--at-fg); border-bottom-color: var(--at-accent); }
+
+.pp-panel { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
+.pp-panel[hidden] { display: none; }
+
+/* Which parts: chips that are real checkboxes. */
+.pp-parts { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0; padding: 0; border: 0; min-width: 0; }
+.pp-parts legend { float: left; margin-inline-end: 0.5rem; padding: 0; font-family: var(--sl-font-mono); font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--at-faint); }
+.pp-chip { position: relative; display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.4375rem 0.75rem 0.4375rem 0.625rem; border: 1px solid var(--at-line); border-radius: var(--at-radius); color: var(--at-muted); font-family: var(--sl-font-mono); font-size: 0.8125rem; line-height: 1.4; cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+/* With enlarged text a long part name wraps inside its chip instead of pushing the page wider. */
+.pp-chip { max-width: 100%; }
+.pp-chip span { min-width: 0; overflow-wrap: anywhere; }
+.pp-chip input { appearance: none; -webkit-appearance: none; flex: none; width: 0.875rem; height: 0.875rem; margin: 0; border: 1px solid var(--at-faint); border-radius: 3px; background: none; cursor: pointer; }
+.pp-chip input:checked { border-color: var(--at-accent); background: var(--at-accent) center / 0.625rem no-repeat; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23171612' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m2.5 6.5 2.5 2.5 4.5-5.5'/%3E%3C/svg%3E"); }
+:root[data-theme="light"] .pp-chip input:checked { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23fffdf8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m2.5 6.5 2.5 2.5 4.5-5.5'/%3E%3C/svg%3E"); }
+.pp-chip:has(input:checked) { border-color: color-mix(in srgb, var(--at-accent) 55%, var(--at-line)); color: var(--at-fg); }
+/* The focus ring belongs to the chip: the box inside is too small to carry it. */
+.pp-chip input:focus-visible { outline: none; }
+.pp-chip:has(input:focus-visible) { outline: 2px solid var(--at-accent); outline-offset: 2px; }
+
+/* The two panes: what you write, what you can read. */
+.pp-panes { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+.pp-pane { display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; border: 1px solid var(--at-line); border-radius: var(--at-radius); background: var(--at-surface); }
+.pp-pane h3 { margin: 0; padding: 0.625rem 1.25rem; border-bottom: 1px solid var(--at-line); font-family: var(--sl-font-mono); font-weight: 400; font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--at-faint); }
+.pp-pane pre { margin: 0; padding: 1.25rem; overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--at-line) transparent; background: none; border: 0; font-family: var(--sl-font-mono); font-size: 0.84rem; line-height: 1.75; color: var(--at-fg); }
+.pp-pane pre code { padding: 0; background: none; font: inherit; color: inherit; }
+.pp-k { color: var(--pp-keyword); }
+.pp-s { color: var(--pp-string); }
+.pp-n { color: var(--pp-number); }
+.pp-p { color: var(--at-muted); }
+.pp-c { color: var(--at-faint); font-style: italic; }
+
+.pp-type { margin: 0; padding: 0.5rem 1.25rem 0.75rem; list-style: none; font-family: var(--sl-font-mono); font-size: 0.8125rem; line-height: 1.5; }
+.pp-part + .pp-part { border-top: 1px solid var(--at-line); }
+.pp-row { display: flex; align-items: baseline; justify-content: space-between; gap: 0.25rem 1.5rem; flex-wrap: wrap; padding: 0.5rem 0; min-width: 0; }
+.pp-row code { padding: 0; background: none; font: inherit; color: var(--at-fg); overflow-wrap: anywhere; transition: color 150ms ease, text-decoration-color 150ms ease; }
+.pp-t { color: var(--pp-type); text-align: end; overflow-wrap: anywhere; }
+.pp-off { display: none; color: var(--at-faint); text-align: end; }
+.pp-fields { margin: 0 0 0.5rem; padding: 0 0 0 1rem; list-style: none; border-inline-start: 1px solid var(--at-line); transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out); }
+.pp-t, .pp-off, .pp-warn { transition: opacity 150ms var(--ease-out); }
+/* What a change brings in arrives where it lands: the fields settle down by a
+   few pixels as they fade in, the short labels only fade. */
+@starting-style {
+  .pp-part[data-on] > .pp-fields { opacity: 0; transform: translateY(-4px); }
+  .pp-part[data-on] > .pp-row .pp-t,
+  .pp-part[data-part]:not([data-on]) > .pp-row .pp-off,
+  .pp-warn { opacity: 0; }
+}
+.pp-fields .pp-row { padding: 0.1875rem 0; }
+.pp-fields .pp-row code { color: var(--at-muted); }
+.pp-note { padding: 0.375rem 0 0.125rem; font-family: var(--sl-font); font-size: 0.8125rem; line-height: 1.5; color: var(--at-faint); }
+
+/* A part that was not requested: its name stays, struck through, with the
+   reason in place of its type. Both go quiet: red is the colour of what is
+   selected here, so it cannot also mean an error. */
+.pp-part[data-part]:not([data-on]) > .pp-row code { color: var(--at-faint); text-decoration: line-through; text-decoration-color: var(--at-faint); }
+.pp-part[data-part]:not([data-on]) > .pp-row .pp-t { display: none; }
+.pp-part[data-part]:not([data-on]) > .pp-row .pp-off { display: inline; }
+.pp-part[data-part]:not([data-on]) > .pp-fields { display: none; }
+
+.pp-foot { display: flex; flex-wrap: wrap; gap: 0.25rem 1.5rem; margin: 0; font-size: 0.875rem; color: var(--at-muted); }
+.pp-foot strong { color: var(--at-fg); font-weight: 600; }
+.pp-warn { color: var(--at-caution); }
+
+@media (min-width: 60rem) {
+  .pp-panes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* A finger needs more room than a pointer. */
+@media (pointer: coarse) {
+  .pp-tab { padding: 0.875rem 1rem; font-size: 0.8125rem; }
+  .pp-chip { min-height: 2.75rem; padding: 0.6875rem 0.875rem 0.6875rem 0.75rem; }
+  .pp-parts legend { float: none; width: 100%; margin-bottom: 0.25rem; }
+}
+@media (hover: hover) and (pointer: fine) {
+  .pp-tab:hover { color: var(--at-fg); }
+  .pp-chip:hover { color: var(--at-fg); }
+}
+@media (prefers-contrast: more) {
+  .pp-chip, .pp-pane { border-color: var(--at-muted); }
+}
+/* Reduced motion keeps the fades and drops the travel: the marker changes
+   place at once, the fields appear without settling. */
+@media (prefers-reduced-motion: reduce) {
+  .pp-marker { transition: none; }
+  .pp-fields { transition: opacity 180ms var(--ease-out); transform: none !important; }
+}

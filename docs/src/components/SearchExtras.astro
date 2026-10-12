@@ -1,0 +1,202 @@
+---
+// What the search dialog shows before anything is typed: the pages opened from
+// a previous search, a few pages worth starting from, and searches to try.
+// It also lets the arrow keys walk through whatever the dialog lists.
+//
+// Starlight owns the dialog and has no slot in it, so this renders a template
+// that the script below moves into place.
+import { getEntry } from "astro:content";
+import { href, useT, type UiKey } from "../i18n";
+
+const { locale } = Astro.locals.starlightRoute;
+const t = useT(locale);
+
+/** Pages offered first, in this order. Titles come from the pages themselves. */
+const STARTING_POINTS = [
+  "start/quick-start",
+  "basics/parts-and-types",
+  "basics/lists",
+  "basics/quota",
+  "auth/oauth",
+  "resources/uploads",
+  "reference/methods",
+];
+/** Searches that show what the index knows: a method, a concept, an error. */
+const QUERIES = ["latestVideos", "quota", "OAuth2", "live chat", "upload"];
+
+/** The part of the documentation a page belongs to, as the sidebar names it. */
+function area(slug: string): string {
+  const folder = slug.includes("/") ? slug.slice(0, slug.indexOf("/")) : "";
+  if (folder === "" || folder === "start") return t("area.start");
+  if (folder === "reference" || folder === "help") return t("area.reference");
+  return t(`area.${folder}` as UiKey);
+}
+
+const pages = (
+  await Promise.all(
+    STARTING_POINTS.map(async (slug) => {
+      // The page in this language when it is translated, the English one otherwise.
+      const entry = (locale && (await getEntry("docs", `${locale}/${slug}`))) || (await getEntry("docs", slug));
+      return entry ? { title: entry.data.title, area: area(slug), href: href(`/${slug}/`, locale) } : undefined;
+    }),
+  )
+).filter((page) => page !== undefined);
+---
+
+<template id="at-search-extras">
+  <div class="at-suggest">
+    <section data-at-recent hidden>
+      <header>
+        <h2>{t("search.recent")}</h2>
+        <button type="button" data-at-forget>{t("search.clear")}</button>
+      </header>
+      <ul></ul>
+    </section>
+    <section>
+      <header><h2>{t("search.start")}</h2></header>
+      <ul>
+        {pages.map((page) => (
+          <li>
+            <a href={page.href}><span>{page.title}</span><small>{page.area}</small></a>
+          </li>
+        ))}
+      </ul>
+    </section>
+    <section>
+      <header><h2>{t("search.try")}</h2></header>
+      <div class="at-queries">
+        {QUERIES.map((query) => (
+          <button class="at-press" type="button" data-at-query={query}>{query}</button>
+        ))}
+      </div>
+    </section>
+  </div>
+  <footer class="at-search-keys" aria-hidden="true">
+    <span><kbd>↑</kbd><kbd>↓</kbd>{t("search.move")}</span>
+    <span><kbd>↵</kbd>{t("search.open")}</span>
+    <span><kbd>esc</kbd>{t("search.close")}</span>
+  </footer>
+</template>
+
+<script>
+  const RECENT_KEY = "at-search-recent";
+  const RECENT_MAX = 4;
+  type Recent = { title: string; href: string };
+
+  /** Whether an address read from storage is a page of this site. */
+  function isLocal(href: string): boolean {
+    try {
+      const url = new URL(href, location.href);
+      return url.origin === location.origin && (url.protocol === "https:" || url.protocol === "http:");
+    } catch {
+      return false;
+    }
+  }
+
+  // Storage can be missing, blocked, or hold anything: the list is a convenience,
+  // never required, and only well-formed entries of this site are kept.
+  function readRecent(): Recent[] {
+    try {
+      const value: unknown = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]");
+      if (!Array.isArray(value)) return [];
+      return value
+        .filter((item): item is Recent => typeof item?.title === "string" && item.title.trim() !== "" && typeof item?.href === "string" && isLocal(item.href))
+        .slice(0, RECENT_MAX);
+    } catch {
+      return [];
+    }
+  }
+  function writeRecent(list: Recent[]): void {
+    try {
+      localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, RECENT_MAX)));
+    } catch {}
+  }
+
+  const dialog = document.querySelector<HTMLDialogElement>("site-search dialog");
+  const container = dialog?.querySelector<HTMLElement>(".search-container");
+  const template = document.querySelector<HTMLTemplateElement>("#at-search-extras");
+
+  if (dialog && container && template) {
+    const extras = template.content.cloneNode(true) as DocumentFragment;
+    const keys = extras.querySelector(".at-search-keys");
+    container.append(extras.querySelector(".at-suggest")!);
+    if (keys) dialog.querySelector(".dialog-frame")?.append(keys);
+
+    const recent = container.querySelector<HTMLElement>("[data-at-recent]")!;
+    const field = (): HTMLInputElement | null => container.querySelector("input.pagefind-ui__search-input");
+
+    /** Lists the pages opened from earlier searches, most recent first. */
+    function showRecent(): void {
+      const list = readRecent();
+      recent.hidden = list.length === 0;
+      recent.querySelector("ul")!.replaceChildren(
+        ...list.map(({ title, href }) => {
+          const item = document.createElement("li");
+          const link = document.createElement("a");
+          const label = document.createElement("span");
+          link.href = href;
+          // A title can be a whole heading: keep it to a readable length.
+          label.textContent = title.length > 120 ? `${title.slice(0, 119).trimEnd()}…` : title;
+          link.append(label);
+          item.append(link);
+          return item;
+        }),
+      );
+    }
+    showRecent();
+
+    dialog.addEventListener("click", (event) => {
+      const target = event.target as Element | null;
+
+      // A search to try: fill the field the way typing would.
+      const query = target?.closest<HTMLElement>("[data-at-query]")?.dataset.atQuery;
+      const input = field();
+      if (query && input) {
+        input.value = query;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.focus();
+        return;
+      }
+
+      if (target?.closest("[data-at-forget]")) {
+        writeRecent([]);
+        showRecent();
+        input?.focus();
+        return;
+      }
+
+      // Starlight closes the dialog for a click on a link itself, not on what it contains.
+      if (target?.closest(".at-suggest a[href]")) dialog.close();
+
+      // A result that gets opened is remembered for next time.
+      const result = target?.closest<HTMLAnchorElement>("#starlight__search a[href]");
+      if (result) {
+        const href = result.getAttribute("href")!;
+        const title = result.textContent?.trim().replace(/\s+/g, " ") ?? "";
+        if (title) writeRecent([{ title, href }, ...readRecent().filter((item) => item.href !== href)]);
+      }
+    });
+    dialog.addEventListener("close", showRecent);
+
+    // The arrow keys walk through the field and everything listed under it.
+    dialog.addEventListener("keydown", (event) => {
+      const input = field();
+      if (!input) return;
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") {
+        // Typing while a result has the focus continues the search.
+        const typing = event.key.length === 1 && event.key !== " " && !event.ctrlKey && !event.metaKey && !event.altKey;
+        if (typing && event.target !== input) input.focus();
+        return;
+      }
+      const stops = [input, ...container.querySelectorAll<HTMLElement>("a[href], [data-at-query], .pagefind-ui__button")].filter(
+        (stop) => stop.getClientRects().length > 0,
+      );
+      const index = stops.indexOf(document.activeElement as HTMLElement);
+      const next = stops[Math.max(0, Math.min(stops.length - 1, index + (event.key === "ArrowDown" ? 1 : -1)))];
+      if (!next) return;
+      event.preventDefault();
+      next.focus();
+      next.scrollIntoView({ block: "nearest" });
+    });
+  }
+</script>

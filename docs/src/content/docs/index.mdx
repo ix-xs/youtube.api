@@ -1,0 +1,51 @@
+---
+title: youtube.api
+description: The complete YouTube API client for JavaScript and TypeScript, typed by the parts you request.
+template: splash
+hero:
+  title: The whole YouTube API, <em>typed by what you ask for.</em>
+  tagline: One client for the Data API, live streaming, Analytics and Reporting. It pages through lists, counts your quota, refreshes OAuth tokens, uploads in resumable chunks and tells you when a channel posts. No dependency, and it runs wherever fetch does.
+  actions:
+    - text: Quick start
+      link: /start/quick-start/
+      variant: primary
+    - text: Every method
+      link: /reference/methods/
+      variant: secondary
+---
+
+import PartPicker from '../../components/PartPicker.astro';
+
+<div class="at-landing not-content">
+
+<section class="at-section">
+  <header data-reveal><span>01</span><h2>Ask for a part, get its type</h2></header>
+  <p data-reveal>YouTube only returns the parts you request, and the types follow. Tick a part: it appears on the result, with its fields. Untick it: reading it stops compiling, instead of being undefined at runtime.</p>
+  <div data-reveal><PartPicker /></div>
+</section>
+
+<section class="at-section">
+  <header data-reveal><span>02</span><h2>What you stop writing</h2></header>
+  <ul class="at-points">
+    <li data-reveal><h3>Page token loops</h3><p>Every list can be awaited for one page or walked with <code>for await</code>. Pages are fetched as you go, at the size that costs the least.</p></li>
+    <li data-reveal><h3>Chunks of 50 ids</h3><p>Pass 500 video ids. They are split into calls, sent together and merged back, in the order you gave.</p></li>
+    <li data-reveal><h3>Handle and URL parsing</h3><p>A channel is <code>@handle</code>, any URL or an id. Same for videos and playlists. Ids resolve for free, handles are remembered.</p></li>
+    <li data-reveal><h3>Quota arithmetic</h3><p><code>yt.quota</code> counts what you spend per bucket and per method, knows when it resets, and can refuse a call before it leaves.</p></li>
+    <li data-reveal><h3>The OAuth dance</h3><p>Consent URL with PKCE, code exchange, refresh before expiry and after a 401. For a script, one call opens the browser and stores the tokens.</p></li>
+    <li data-reveal><h3>The upload protocol</h3><p>Give a file. Small ones go in one request, large ones in resumable chunks with progress, retries and resume.</p></li>
+  </ul>
+</section>
+
+<section class="at-section">
+  <header data-reveal><span>03</span><h2>Where to go next</h2></header>
+  <ul class="at-paths">
+    <li data-reveal><a href="/start/quick-start/"><span>01</span><div><strong>Quick start</strong><small>Get a key, install, and read a channel and its latest videos in five minutes.</small></div></a></li>
+    <li data-reveal><a href="/basics/parts-and-types/"><span>02</span><div><strong>Basics</strong><small>Parts and types, lists, quota, errors, caching. Twenty minutes that pay for themselves.</small></div></a></li>
+    <li data-reveal><a href="/auth/oauth/"><span>03</span><div><strong>Authentication</strong><small>OAuth for web apps, scripts and devices, scopes, and serving many users.</small></div></a></li>
+    <li data-reveal><a href="/resources/uploads/"><span>04</span><div><strong>Uploads</strong><small>Videos, thumbnails and captions, with progress and resume.</small></div></a></li>
+    <li data-reveal><a href="/notifications/watching-uploads/"><span>05</span><div><strong>Notifications</strong><small>Know when a channel uploads, by polling or by push, for little or no quota.</small></div></a></li>
+    <li data-reveal><a href="/reference/methods/"><span>06</span><div><strong>Reference</strong><small>All 98 methods with their cost, every export, error codes, troubleshooting.</small></div></a></li>
+  </ul>
+</section>
+
+</div>

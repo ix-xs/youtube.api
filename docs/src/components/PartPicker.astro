@@ -1,0 +1,176 @@
+---
+// The landing page's playground: pick the parts of a resource and see the call
+// you would write next to what its result lets you read. Everything shown
+// comes from the library's own type data (`src/data/parts.json`, written by
+// `scripts/reference.mjs`), so it says what the compiler says.
+//
+// Without scripts the first state of each resource is rendered as is.
+import real from "../data/parts.json";
+import worst from "../data/parts.worst.json";
+import { callHtml } from "./part-code";
+
+// Development only: PICKER_DATA=worst builds the playground with the longest
+// names and types the API has, and PICKER_TICK=all|none sets what is ticked.
+// A normal build ignores both.
+const stress = process.env.PICKER_DATA === "worst";
+const tick = process.env.PICKER_TICK;
+const resources = stress ? worst : real;
+
+/** What is ticked when the page opens. */
+const INITIAL: Record<string, string[]> = {
+  Video: ["snippet", "statistics"],
+  Channel: ["snippet", "statistics"],
+  Playlist: ["snippet", "contentDetails"],
+};
+/** Why a part can be missing although it was requested. */
+const WHY_OPTIONAL: Record<string, string> = {
+  liveStreamingDetails: "Only live videos have it, so it stays optional even when requested.",
+};
+---
+
+<part-picker class="pp">
+  <div class="pp-tabs" role="tablist" aria-label="Resource">
+    {resources.map((resource, index) => (
+      <button class="pp-tab at-press" type="button" role="tab" id={`pp-tab-${resource.name}`} aria-controls={`pp-panel-${resource.name}`} aria-selected={index === 0 ? "true" : "false"} tabindex={index === 0 ? 0 : -1}>
+        {resource.name}
+      </button>
+    ))}
+  </div>
+
+  {resources.map((resource, index) => {
+    const all = resource.parts.map((part) => part.name);
+    const initial = tick === "all" ? all : tick === "none" ? [] : (INITIAL[resource.name] ?? all.slice(0, 1));
+    return (
+      <div class="pp-panel" role="tabpanel" id={`pp-panel-${resource.name}`} aria-labelledby={`pp-tab-${resource.name}`} hidden={index !== 0} data-call={resource.call} data-id={resource.id} data-variable={resource.variable}>
+        <fieldset class="pp-parts">
+          <legend>Parts to request</legend>
+          {resource.parts.map((part) => (
+            <label class="pp-chip at-press">
+              <input type="checkbox" value={part.name} checked={initial.includes(part.name)} />
+              <span>{part.name}</span>
+            </label>
+          ))}
+        </fieldset>
+
+        <div class="pp-panes">
+          <section class="pp-pane" aria-label="The call you write">
+            <h3>You write</h3>
+            <pre tabindex="0"><code data-pp-code set:html={callHtml(resource, initial)} /></pre>
+          </section>
+
+          <section class="pp-pane" aria-label="What the result lets you read" aria-live="polite">
+            <h3>You can read</h3>
+            <ul class="pp-type">
+              <li class="pp-part" data-on>
+                <div class="pp-row"><code>{resource.variable}.id</code><span class="pp-t">string</span></div>
+              </li>
+              {resource.parts.map((part) => (
+                <li class="pp-part" data-part={part.name} data-on={initial.includes(part.name) ? "" : undefined}>
+                  <div class="pp-row">
+                    <code>{resource.variable}.{part.name}{part.always ? "" : "?"}</code>
+                    <span class="pp-t">{part.type}</span>
+                    <span class="pp-off">not requested: does not compile</span>
+                  </div>
+                  <ul class="pp-fields">
+                    {part.fields.map((field) => (
+                      <li class="pp-row">
+                        <code>.{field.name}</code>
+                        <span class="pp-t">{field.type}{field.optional ? " | undefined" : ""}</span>
+                      </li>
+                    ))}
+                    {WHY_OPTIONAL[part.name] && <li class="pp-note">{WHY_OPTIONAL[part.name]}</li>}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+
+        <p class="pp-foot">
+          <span>Quota: <strong>1 unit</strong> per call, whatever the parts.</span>
+          <span class="pp-warn" data-pp-empty hidden>Pick at least one part.</span>
+        </p>
+      </div>
+    );
+  })}
+</part-picker>
+
+<script>
+  import { callHtml } from "./part-code";
+
+  class PartPicker extends HTMLElement {
+    constructor() {
+      super();
+      const tabs = [...this.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+      const panels = [...this.querySelectorAll<HTMLElement>('[role="tabpanel"]')];
+
+      const list = this.querySelector<HTMLElement>('[role="tablist"]')!;
+      const marker = document.createElement("span");
+      marker.className = "pp-marker";
+      marker.setAttribute("aria-hidden", "true");
+      list.append(marker);
+      list.setAttribute("data-pp-marker", "");
+
+      /** Puts the marker under the selected tab: sliding there, or at once. */
+      const place = (slide: boolean) => {
+        const active = tabs.find((tab) => tab.getAttribute("aria-selected") === "true");
+        if (!active || active.offsetWidth === 0) return;
+        if (!slide) marker.style.transition = "none";
+        marker.style.transform = `translateX(${active.offsetLeft}px) scaleX(${active.offsetWidth / 100})`;
+        if (!slide) {
+          // Apply the jump before the transition comes back.
+          void marker.offsetWidth;
+          marker.style.transition = "";
+        }
+      };
+
+      const select = (index: number, focus: boolean, slide: boolean) => {
+        tabs.forEach((tab, position) => {
+          const active = position === index;
+          tab.setAttribute("aria-selected", String(active));
+          tab.tabIndex = active ? 0 : -1;
+          panels[position]!.hidden = !active;
+        });
+        if (focus) tabs[index]!.focus();
+        place(slide);
+      };
+
+      place(false);
+      addEventListener("resize", () => place(false));
+      // Fonts arriving change the width of the tabs.
+      void document.fonts?.ready.then(() => place(false));
+
+      tabs.forEach((tab, index) => {
+        // `detail` is 0 when the click comes from the keyboard: no slide then.
+        tab.addEventListener("click", (event) => select(index, false, event.detail > 0));
+        tab.addEventListener("keydown", (event) => {
+          const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+          const target = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : step ? (index + step + tabs.length) % tabs.length : -1;
+          if (target === -1) return;
+          event.preventDefault();
+          select(target, true, false);
+        });
+      });
+
+      for (const panel of panels) {
+        const boxes = [...panel.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+        const code = panel.querySelector<HTMLElement>("[data-pp-code]")!;
+        const empty = panel.querySelector<HTMLElement>("[data-pp-empty]")!;
+        const resource = { call: panel.dataset.call!, id: panel.dataset.id!, variable: panel.dataset.variable! };
+
+        const render = () => {
+          const parts = boxes.filter((box) => box.checked).map((box) => box.value);
+          code.innerHTML = callHtml(resource, parts);
+          empty.hidden = parts.length > 0;
+          for (const row of panel.querySelectorAll<HTMLElement>("[data-part]")) {
+            row.toggleAttribute("data-on", parts.includes(row.dataset.part!));
+          }
+        };
+        for (const box of boxes) box.addEventListener("change", render);
+        // A form restored by the browser can differ from what was rendered.
+        render();
+      }
+    }
+  }
+  customElements.define("part-picker", PartPicker);
+</script>
