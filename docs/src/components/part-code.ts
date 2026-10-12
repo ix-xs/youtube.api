@@ -5,6 +5,8 @@ export interface PickerResource {
   call: string;
   id: string;
   variable: string;
+  /** The comment shown in place of the result when no part is ticked, in the language of the page. */
+  refused: string;
 }
 
 const k = (text: string) => `<span class="pp-k">${text}</span>`;
@@ -25,7 +27,7 @@ export function callHtml(resource: PickerResource, parts: readonly string[]): st
     `  id${p(":")} ${s(resource.id)}${p(",")}`,
     `${p("});")}`,
     "",
-    parts.length ? `${k("const")} ${resource.variable} ${p("=")} items${p("[")}<span class="pp-n">0</span>${p("];")}` : c("// The API refuses a call without parts."),
+    parts.length ? `${k("const")} ${resource.variable} ${p("=")} items${p("[")}<span class="pp-n">0</span>${p("];")}` : c(`// ${resource.refused}`),
   ];
   return lines.join("\n");
 }

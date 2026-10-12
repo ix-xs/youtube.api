@@ -8,21 +8,24 @@ sidebar:
 ```ts
 import { websub } from "@ix-xs/youtube.api";
 
+const secret = process.env.WEBSUB_SECRET;
+
 // Once: ask the hub to notify your endpoint.
 await websub.subscribe({
   channelId: "UC_x5XG1OV2P6uZZ5FSM9Ttw",
   callbackUrl: "https://example.com/youtube/webhook",
-  secret: process.env.WEBSUB_SECRET,
+  secret,
 });
 
 // On every request the hub sends to that URL.
 export async function handler(request: Request): Promise<Response> {
-  const { response, notifications } = await websub.receive(request, { secret: process.env.WEBSUB_SECRET });
+  const result = await websub.receive(request, { secret });
 
-  for (const notification of notifications) {
-    if (notification.type === "video") console.log("New or updated:", notification.title, notification.url);
+  for (const notification of result.notifications) {
+    if (notification.type !== "video") continue;
+    console.log("New or updated:", notification.title, notification.url);
   }
-  return response;
+  return result.response;
 }
 ```
 
@@ -53,7 +56,8 @@ await websub.subscribe({
 | `callbackUrl` | Public HTTPS URL of your endpoint |
 | `secret` | Shared secret. The hub signs every notification with it |
 | `lease` | How long the subscription lasts. Default `"5d"`. The hub caps it at about 10 days |
-| `signal`, `fetch` | Cancellation, and a custom `fetch` |
+| `signal` | Cancels the request to the hub. There is no timeout otherwise |
+| `fetch` | Custom `fetch` |
 
 `subscribe` resolves when the hub has accepted the request. The subscription is not active yet: the hub first calls your endpoint to confirm. Your endpoint must be up before you subscribe.
 
@@ -62,13 +66,22 @@ await websub.subscribe({
 ```ts
 const id = await yt.channels.resolveId("@GoogleDevelopers");
 
-if (id) await websub.subscribe({ channelId: id, callbackUrl: "https://example.com/youtube/webhook", secret });
+if (id) {
+  await websub.subscribe({
+    channelId: id,
+    callbackUrl: "https://example.com/youtube/webhook",
+    secret,
+  });
+}
 ```
 
 To stop, call `unsubscribe` with the same channel and callback URL. The hub confirms that too.
 
 ```ts
-await websub.unsubscribe({ channelId, callbackUrl: "https://example.com/youtube/webhook" });
+await websub.unsubscribe({
+  channelId,
+  callbackUrl: "https://example.com/youtube/webhook",
+});
 ```
 
 ## Receiving
@@ -81,7 +94,7 @@ const result = await websub.receive(request, { secret });
 result.response; // send this back
 result.notifications; // what changed, possibly empty
 result.confirmation; // set when the hub was confirming a subscription
-result.verified; // false when the signature was missing or wrong
+result.verified; // false when the request was rejected
 ```
 
 | Field | Content |
@@ -89,7 +102,7 @@ result.verified; // false when the signature was missing or wrong
 | `response` | The HTTP response for the hub. It carries the challenge for a confirmation and the right status otherwise |
 | `notifications` | The notifications of the request. Empty for a confirmation or a rejected request |
 | `confirmation` | `{ mode, topic, channelId, leaseSeconds }` when the request was a confirmation, else `undefined` |
-| `verified` | `false` when a secret was expected and the signature was missing or wrong |
+| `verified` | `false` when a secret was expected and the signature was missing or wrong, or when the body was too large |
 
 Answer fast. The hub only waits a few seconds, so return the response first and do slow work after it.
 
@@ -101,11 +114,13 @@ Answer fast. The hub only waits a few seconds, so return the response first and 
 // app/youtube/webhook/route.ts
 import { websub } from "@ix-xs/youtube.api";
 
+const secret = process.env.WEBSUB_SECRET;
+
 async function handle(request: Request): Promise<Response> {
-  const { response, notifications } = await websub.receive(request, { secret: process.env.WEBSUB_SECRET });
+  const { response, notifications } = await websub.receive(request, { secret });
 
   for (const notification of notifications) {
-    if (notification.type === "video") await notify(`${notification.title} ${notification.url}`);
+    if (notification.type === "video") console.log(notification.title);
   }
   return response;
 }
@@ -117,7 +132,9 @@ Hono, where `c.req.raw` is the `Request`:
 
 ```ts
 app.all("/youtube/webhook", async (c: { req: { raw: Request } }) => {
-  const { response, notifications } = await websub.receive(c.req.raw, { secret });
+  const { response, notifications } = await websub.receive(c.req.raw, {
+    secret,
+  });
   for (const notification of notifications) console.log(notification);
   return response;
 });
@@ -132,13 +149,21 @@ interface Env {
   WEBSUB_SECRET: string;
 }
 
+interface Context {
+  waitUntil(promise: Promise<unknown>): void;
+}
+
 async function handleAll(notifications: WebSubNotification[]): Promise<void> {
-  for (const notification of notifications) console.log(notification.type, notification.videoId);
+  for (const notification of notifications) {
+    console.log(notification.type, notification.videoId);
+  }
 }
 
 export default {
-  async fetch(request: Request, env: Env, ctx: { waitUntil(promise: Promise<unknown>): void }): Promise<Response> {
-    const { response, notifications } = await websub.receive(request, { secret: env.WEBSUB_SECRET });
+  async fetch(request: Request, env: Env, ctx: Context): Promise<Response> {
+    const { response, notifications } = await websub.receive(request, {
+      secret: env.WEBSUB_SECRET,
+    });
     ctx.waitUntil(handleAll(notifications));
     return response;
   },
@@ -157,9 +182,12 @@ createServer(
   webSubListener({
     secret: process.env.WEBSUB_SECRET,
     onNotification: async (notification) => {
-      if (notification.type === "video") await notify(`${notification.title} ${notification.url}`);
+      if (notification.type !== "video") return;
+      await notify(`${notification.title} ${notification.url}`);
     },
-    onConfirmation: ({ mode, channelId, leaseSeconds }) => console.log(mode, channelId, leaseSeconds),
+    onConfirmation: ({ mode, channelId, leaseSeconds }) => {
+      console.log(mode, channelId, leaseSeconds);
+    },
     onError: (error) => console.error("Handler failed:", error),
   }),
 ).listen(3000);
@@ -188,19 +216,23 @@ The listener reads the request body itself, because the signature is computed ov
 | `onError` | Called when a handler throws. Default: logs to the console |
 | `secret`, `confirm` | The options of `receive` |
 
+Without `onNotification`, `webSubListener` throws a `YouTubeArgumentError`.
+
 ## Signatures
 
 The callback URL is public. Anyone who finds it can post a fake notification to it. Always set a `secret`.
 
-With a secret, the hub signs each notification and `receive` checks the signature:
+With a secret, the hub signs each notification in an `X-Hub-Signature` header, and `receive` checks it:
 
 - A notification without a valid signature is dropped. `notifications` is empty and `verified` is `false`.
 - The response is still a success status. The WebSub specification asks for it, so that a forger learns nothing.
 
-Give the same secret to `subscribe` and to `receive`. Without the `secret` option, `receive` checks nothing and `verified` is always `true`.
+Give the same secret to `subscribe` and to `receive`. Without the `secret` option, `receive` checks no signature.
 
 ```ts
-const { response, notifications, verified } = await websub.receive(request, { secret });
+const { response, notifications, verified } = await websub.receive(request, {
+  secret,
+});
 
 if (!verified) console.warn("Dropped a request with a bad signature");
 ```
@@ -244,7 +276,11 @@ To renew, call `subscribe` again with the same arguments before the lease ends. 
 const followed: string[] = await db.get("channels");
 
 for (const id of followed) {
-  await websub.subscribe({ channelId: id, callbackUrl: "https://example.com/youtube/webhook", secret });
+  await websub.subscribe({
+    channelId: id,
+    callbackUrl: "https://example.com/youtube/webhook",
+    secret,
+  });
 }
 ```
 
@@ -300,11 +336,11 @@ A notification carries little. For the duration, the statistics or the privacy s
 | `websub.receive(request, options)` | Handles a request from the hub: confirmations, signatures, parsing |
 | `websub.parse(xml)` | Parses the Atom body of a notification |
 | `websub.verify(body, header, secret)` | Checks an `X-Hub-Signature` header against your secret. Resolves to a boolean |
-| `websub.topicUrl(channelId)` | The topic URL that identifies a channel at the hub |
-| `websub.hub` | Address of the hub |
+| `websub.topicUrl(channelId)` | The topic URL that identifies a channel at the hub: `https://www.youtube.com/xml/feeds/videos.xml?channel_id=...` |
+| `websub.hub` | Address of the hub: `https://pubsubhubbub.appspot.com/subscribe` |
 | `webSubListener(options)` | The same as `receive`, for `node:http` and Express. From `@ix-xs/youtube.api/node` |
 
-`parse` and `verify` are for a framework that hands you the body as text and not a `Request`. `verify` needs the body exactly as it was received.
+`parse` and `verify` are for a framework that hands you the body as text and not a `Request`. `verify` takes the body as a string or as bytes, and needs it exactly as it was received.
 
 ### How `receive` answers
 
@@ -315,14 +351,14 @@ A notification carries little. For the duration, the statistics or the privacy s
 | `GET` that is not a confirmation | 400 | |
 | `POST` with a valid signature, or no secret expected | 204 | `notifications` is filled |
 | `POST` with a missing or wrong signature | 202 | `verified` is `false` |
-| `POST` larger than 1 MiB | 413 | `verified` is `false` |
+| `POST` with a body over 1 MiB | 413 | `verified` is `false` |
 | Any other method | 405 | |
 
 ## Limits and errors
 
-- `subscribe` and `unsubscribe` throw a `YouTubeRequestError`. The code is `NETWORK` when the hub cannot be reached, and `HUB_ERROR` when it answers with an error status, for a callback URL it refuses for instance. The message carries the hub's answer.
-- A body larger than 1 MiB is refused with a 413. A notification is a few kilobytes.
-- The hub reaches public URLs only. For local development, expose your machine through a tunnel and subscribe with the tunnel's URL.
+- `subscribe` and `unsubscribe` throw a `YouTubeRequestError`. The code is `NETWORK` when the hub cannot be reached, `HUB_ERROR` when the hub refuses and answers with an error status, and `ABORTED` when your `signal` was aborted. The message of a `HUB_ERROR` carries the status and the start of the hub's answer.
+- `receive` reads the body up to 1 MiB, counted in bytes. Beyond that it stops reading, keeps nothing more in memory and answers 413. `webSubListener` does the same. A notification is a few kilobytes.
+- The hub needs a public URL. For local development, expose your machine through a tunnel and subscribe with the tunnel's URL.
 - A lapsed lease stops notifications without any error on your side. Store the expiry and renew.
 - Notifications are about videos only: published, title or description changed, deleted or made private.
 

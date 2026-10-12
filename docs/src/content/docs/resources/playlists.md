@@ -7,7 +7,8 @@ sidebar:
 
 ```ts
 for await (const item of yt.playlists.items("PLBCF2DAC6FFB574DE")) {
-  console.log(item.snippet.position, item.snippet.title, item.contentDetails.videoId);
+  const { position, title } = item.snippet;
+  console.log(position, title, item.contentDetails.videoId);
 }
 ```
 
@@ -16,19 +17,24 @@ for await (const item of yt.playlists.items("PLBCF2DAC6FFB574DE")) {
 `yt.playlists.get` takes a playlist id, or any URL with a `list` parameter: a playlist page, or a watch page that plays a video inside the playlist. It costs 1 quota unit and resolves to `null` when the playlist does not exist or is private.
 
 ```ts
-const playlist = await yt.playlists.get("https://www.youtube.com/playlist?list=PLBCF2DAC6FFB574DE");
+const playlist = await yt.playlists.get(
+  "https://www.youtube.com/playlist?list=PLBCF2DAC6FFB574DE",
+);
 
 if (playlist) {
-  console.log(playlist.snippet.title, "by", playlist.snippet.channelTitle);
-  console.log(playlist.contentDetails.itemCount, "videos,", playlist.status.privacyStatus);
+  const { title, channelTitle } = playlist.snippet;
+
+  console.log(title, "by", channelTitle);
+  console.log(playlist.contentDetails.itemCount, "videos");
+  console.log(playlist.status.privacyStatus);
 }
 ```
 
-The default parts are `snippet`, `contentDetails` and `status`. A string that is neither a playlist id nor such a URL throws a `YouTubeArgumentError` before anything is sent.
+The default parts are `snippet`, `contentDetails` and `status`. A string that is neither such a URL nor shaped like a playlist id (`PL...`, `UU...` and the like) throws a `YouTubeArgumentError` before anything is sent.
 
 ## Listing the items of a playlist
 
-`yt.playlists.items` lists what is in a playlist, in playlist order. It costs 1 unit per page of 50.
+`yt.playlists.items` lists what is in a playlist, in playlist order. It costs 1 unit per page of 50. Awaited, it returns a page of 50.
 
 ```ts
 const firstHundred = await yt.playlists.items(playlistId).take(100); // 2 units
@@ -55,7 +61,7 @@ A playlist item is not a video. It is a light entry that points to one:
 
 There is no duration and no view count. For those, use [`yt.playlists.videos`](#walking-the-videos-of-a-playlist).
 
-Deleted and private videos still appear in the list. Their item has a placeholder title and no thumbnails, so [`bestThumbnail`](/basics/ids-and-urls/#formatting) returns `undefined` for them.
+A deleted or private video keeps its item in the list. The item has the title "Deleted video" or "Private video" and no thumbnails, so [`bestThumbnail`](/basics/ids-and-urls/#formatting) returns `undefined` for it.
 
 `get` resolves to `null` for a playlist that does not exist. Listing the items of one fails instead, with a `NOT_FOUND` error.
 
@@ -65,16 +71,20 @@ Deleted and private videos still appear in the list. Their item has a placeholde
 
 ```ts
 for await (const video of yt.playlists.videos(playlistId)) {
-  console.log(video.snippet.title, formatDuration(video.contentDetails.duration), video.statistics.viewCount);
+  const duration = formatDuration(video.contentDetails.duration);
+  console.log(video.snippet.title, duration, video.statistics.viewCount);
 }
 ```
 
-Deleted and private videos are skipped. `part` chooses the video parts, `snippet`, `contentDetails` and `statistics` by default. `limit` stops early:
+Deleted and private videos are skipped. A video that is in the playlist twice is yielded twice. `part` chooses the video parts, `snippet`, `contentDetails` and `statistics` by default. `limit` stops early:
 
 ```ts
 const firstTen = [];
 
-for await (const video of yt.playlists.videos(playlistId, { part: "snippet", limit: 10 })) {
+for await (const video of yt.playlists.videos(playlistId, {
+  part: "snippet",
+  limit: 10,
+})) {
   firstTen.push(video.snippet.title);
 }
 ```
@@ -88,15 +98,17 @@ Unlike `items`, this is a plain async generator: it has no `take` or `all`. Use 
 The total duration of a playlist needs the duration of every video, which only the video resource has. Ask for `contentDetails` alone to keep the responses small:
 
 ```ts
+const walk = yt.playlists.videos(playlistId, { part: "contentDetails" });
 let seconds = 0;
 let count = 0;
 
-for await (const video of yt.playlists.videos(playlistId, { part: "contentDetails" })) {
+for await (const video of walk) {
   seconds += parseDuration(video.contentDetails.duration);
   count++;
 }
 
-console.log(count, "videos,", formatDuration(seconds, "short")); // for example "212 videos, 31h 4m 12s"
+console.log(count, "videos,", formatDuration(seconds, "short"));
+// for example: 212 videos, 31h 4m 12s
 ```
 
 A playlist of 500 videos costs 20 units this way: 10 pages of items and 10 calls for the videos. [Playlist length](/recipes/playlist-length/) turns it into a complete script.
@@ -129,11 +141,15 @@ console.log(playlist.id, playlist.status.privacyStatus);
 ```ts
 await yt.playlists.add(playlistId, "https://youtu.be/dQw4w9WgXcQ");
 
-const item = await yt.playlists.add(playlistId, videoId, { position: 0, note: "Start here" });
+const item = await yt.playlists.add(playlistId, videoId, {
+  position: 0,
+  note: "Start here",
+});
+
 console.log(item.id); // the playlist item id
 ```
 
-`yt.playlists.removeVideo` removes every occurrence of a video from a playlist and resolves to the number of items removed. It costs 1 unit to find the items, then 50 per item removed.
+`yt.playlists.removeVideo` removes every occurrence of a video from a playlist and resolves to the number of items removed. It needs OAuth. It costs 1 unit to find the items, then 50 per item removed.
 
 ```ts
 const removed = await yt.playlists.removeVideo(playlistId, videoId);
@@ -146,7 +162,9 @@ console.log(removed); // 0 when the video was not in the playlist
 
 ```ts
 const item = await yt.playlistItems.insert({
-  body: { snippet: { playlistId, resourceId: { kind: "youtube#video", videoId } } },
+  body: {
+    snippet: { playlistId, resourceId: { kind: "youtube#video", videoId } },
+  },
 });
 
 await yt.playlistItems.delete({ id: item.id }); // not videoId
@@ -155,31 +173,42 @@ await yt.playlistItems.delete({ id: item.id }); // not videoId
 To move an item, update its `snippet.position`. The snippet must carry `playlistId` and `resourceId` too, since a part you send replaces the whole part:
 
 ```ts
-const item = await yt.playlistItems.list({ part: "snippet", playlistId, videoId }).first();
+const item = await yt.playlistItems
+  .list({ part: "snippet", playlistId, videoId })
+  .first();
 
 if (item) {
   await yt.playlistItems.update({
-    body: { id: item.id, snippet: { playlistId, position: 0, resourceId: item.snippet.resourceId } },
+    body: {
+      id: item.id,
+      snippet: { playlistId, position: 0, resourceId: item.snippet.resourceId },
+    },
   });
 }
 ```
 
-`playlistItems.list` takes `playlistId`, optionally narrowed by `videoId` as above, or a list of item ids in `id`. It costs 1 unit per page of 50. The three writes cost 50 units each and need OAuth.
+`playlistItems.list` takes `playlistId`, optionally narrowed by `videoId` as above, or a list of item ids in `id`. It costs 1 unit per page of 50. Awaited without `maxResults`, it returns the API's default page of 5, where `yt.playlists.items` asks for 50. The three writes cost 50 units each and need OAuth.
 
 ## Using the raw `playlists` methods
 
 `yt.playlists.list` fetches playlists by `id`, the playlists of a channel with `channelId`, or your own with `mine: true`. It costs 1 unit per page of 50.
 
 ```ts
-const playlists = await yt.playlists.list({ part: ["snippet", "contentDetails"], channelId }).all();
+const playlists = await yt.playlists
+  .list({ part: ["snippet", "contentDetails"], channelId })
+  .all();
 
-for (const playlist of playlists) console.log(playlist.snippet.title, playlist.contentDetails.itemCount);
+for (const playlist of playlists) {
+  console.log(playlist.snippet.title, playlist.contentDetails.itemCount);
+}
 ```
 
 `insert`, `update` and `delete` need OAuth and cost 50 units each. An update replaces the parts it sends, and a `snippet` must carry `title`. Read the part, change it, send it back:
 
 ```ts
-const playlist = await yt.playlists.get(playlistId, { part: ["snippet", "status"] });
+const playlist = await yt.playlists.get(playlistId, {
+  part: ["snippet", "status"],
+});
 
 if (playlist) {
   await yt.playlists.update({
@@ -198,29 +227,18 @@ await yt.playlists.delete({ id: playlistId });
 
 ## Reading the special playlists of a channel
 
-Every channel has playlists that YouTube builds for it. Their ids derive from the channel id, so `channelPlaylistId` computes them without a call. Reading one costs 1 unit per 50 videos, like any playlist.
+Every channel has playlists that YouTube builds for it: its uploads, its Shorts, its live streams and a few more. `channelPlaylistId` derives their ids from the channel id, without a call. Reading one costs 1 unit per 50 videos, like any playlist.
 
 ```ts
 import { channelPlaylistId } from "@ix-xs/youtube.api";
 
 channelPlaylistId("UC_x5XG1OV2P6uZZ5FSM9Ttw"); // "UU_x5XG1OV2P6uZZ5FSM9Ttw"
-channelPlaylistId("UC_x5XG1OV2P6uZZ5FSM9Ttw", "shorts"); // "UUSH_x5XG1OV2P6uZZ5FSM9Ttw"
 
-const popular = await yt.playlists.items(channelPlaylistId(channelId, "popularVideos")).take(10);
+const popularId = channelPlaylistId(channelId, "popularVideos");
+const popular = await yt.playlists.items(popularId).take(10);
 ```
 
-| Kind | Prefix | Content |
-| --- | --- | --- |
-| `"uploads"` (default) | `UU` | Everything the channel uploaded |
-| `"videos"` | `UULF` | Regular videos, without Shorts and live streams |
-| `"shorts"` | `UUSH` | Shorts only |
-| `"live"` | `UULV` | Live streams only |
-| `"popularVideos"` | `UULP` | Popular regular videos |
-| `"popularShorts"` | `UUPS` | Popular Shorts |
-| `"popularLive"` | `UUPV` | Popular live streams |
-| `"membersOnlyVideos"` | `UUMO` | Members-only videos |
-
-Only `uploads` is documented by YouTube: it is the `contentDetails.relatedPlaylists.uploads` of the channel. The other kinds are not documented, but they have been stable for years.
+[IDs and URLs](/basics/ids-and-urls/) lists the eight kinds and says which one YouTube documents.
 
 The function wants a `UC...` id and throws a `YouTubeArgumentError` for anything else. With a handle or a URL, use [`yt.channels.uploads`](/resources/channels/), which resolves the channel first.
 
@@ -229,14 +247,21 @@ The function wants a `UC...` id and throws a `YouTubeArgumentError` for anything
 A playlist can have a custom thumbnail image, managed by `yt.playlistImages`. Listing costs 1 unit and works with an API key. `insert`, `update` and `delete` need OAuth and cost 50 units each. The image is a JPEG or a PNG of 50 MB at most.
 
 ```ts
-const { items } = await yt.playlistImages.list({ part: "snippet", parent: playlistId });
+const { items } = await yt.playlistImages.list({
+  part: "snippet",
+  parent: playlistId,
+});
 
 const created = await yt.playlistImages.insert({
   body: { snippet: { playlistId, type: "hero", width: 1080, height: 1080 } },
   media: image,
 });
 
-await yt.playlistImages.update({ body: { id: created.id, snippet: { playlistId, type: "hero" } }, media: image });
+await yt.playlistImages.update({
+  body: { id: created.id, snippet: { playlistId, type: "hero" } },
+  media: image,
+});
+
 await yt.playlistImages.delete({ id: created.id });
 ```
 
@@ -244,13 +269,13 @@ await yt.playlistImages.delete({ id: created.id });
 
 ## Handling errors
 
-A failed call throws a `YouTubeApiError` whose `reason` says what the API refused. The ones typed for playlists:
+A call the API refuses throws a `YouTubeApiError` whose `reason` says why. The ones typed for playlists:
 
 | `error.reason` | When |
 | --- | --- |
-| `playlistNotFound` | The playlist does not exist, or the credentials cannot see it |
+| `playlistNotFound` | The playlist was not found |
 | `playlistItemNotFound` | No item has this playlist item id |
-| `videoNotFound` | The video does not exist |
+| `videoNotFound` | The video was not found |
 | `videoAlreadyInPlaylist` | The video is already in the playlist |
 | `playlistContainsMaximumNumberOfVideos` | The playlist is full |
 | `playlistForbidden` | The request is not allowed on this playlist |
@@ -259,7 +284,10 @@ A failed call throws a `YouTubeApiError` whose `reason` says what the API refuse
 try {
   await yt.playlists.add(playlistId, videoId);
 } catch (error) {
-  if (error instanceof YouTubeApiError && error.reason === "playlistContainsMaximumNumberOfVideos") {
+  if (
+    error instanceof YouTubeApiError &&
+    error.reason === "playlistContainsMaximumNumberOfVideos"
+  ) {
     console.log("The playlist is full");
   } else {
     throw error;
@@ -305,7 +333,7 @@ Parts of a playlist:
 | Part | What it holds | Always returned when requested |
 | --- | --- | --- |
 | `snippet` | Title, description, channel, creation date, thumbnails | Yes |
-| `contentDetails` | `itemCount`, the number of videos | Yes |
+| `contentDetails` | `itemCount`, the number of items | Yes |
 | `status` | Privacy status, podcast status | Yes |
 | `player` | The `<iframe>` HTML of an embedded player | Yes |
 | `localizations` | Title and description per language | No |

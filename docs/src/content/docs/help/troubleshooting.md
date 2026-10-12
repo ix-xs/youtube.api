@@ -7,8 +7,11 @@ description: The failures people meet first, by symptom. Each entry gives the ca
 try {
   await yt.videos.get(videoId);
 } catch (error) {
-  if (error instanceof YouTubeApiError) console.error(error.code, error.status, error.reason, error.message);
-  else if (isYouTubeError(error)) console.error(error.code, error.message);
+  if (error instanceof YouTubeApiError) {
+    console.error(error.code, error.status, error.reason, error.message);
+  } else if (isYouTubeError(error)) {
+    console.error(error.code, error.message);
+  }
   throw error;
 }
 ```
@@ -23,7 +26,9 @@ Start there. The `code` and the `reason` are what the entries below are keyed on
 
 **Cause.** The string sent as the key is not a key of any project: a truncated copy, quotes or a space around it, a key that was deleted, or an OAuth client id pasted in its place.
 
-**Fix.** Copy the key again from **APIs & Services > Credentials** in the Google Cloud console. When you rely on the environment, check that the variable is named `YOUTUBE_API_KEY` and is set in the process that runs your code. It is only read when the client gets no `apiKey`.
+**Fix.** Copy the key again from **APIs & Services > Credentials** in the Google Cloud console. When you rely on the environment, check that the variable is named `YOUTUBE_API_KEY` and is set in the process that runs your code.
+
+The variable is read whenever `apiKey` is left out, also on a client created with `oauth` or `accessToken`. A stale `YOUTUBE_API_KEY` in the environment can therefore surface on an OAuth client: public reads go out with the key while there is no usable token. Unset the variable or pass the right `apiKey`.
 
 ### "YouTube Data API v3 has not been used in project ... before or it is disabled"
 
@@ -43,7 +48,8 @@ Start there. The `code` and the `reason` are what the entries below are keyed on
 try {
   await yt.playlists.create({ title: "Favourites" });
 } catch (error) {
-  if (error instanceof YouTubeAuthError && error.code === "MISSING_CREDENTIALS") {
+  if (!(error instanceof YouTubeAuthError)) throw error;
+  if (error.code === "MISSING_CREDENTIALS") {
     console.log("Needs OAuth with one of:", error.scopes.join(", "));
   }
 }
@@ -51,9 +57,23 @@ try {
 
 The same code with the message "This OAuth2 client has no tokens yet" means the `OAuth2` object exists and the user never went through consent, or the saved tokens were not passed as `tokens`.
 
+### A public read fails before the user has signed in
+
+**Cause.** The client was created with `oauth` only. Until the user has been through consent there is no token, and no key to fall back on: even `yt.videos.get` throws `MISSING_CREDENTIALS`.
+
+**Fix.** Give the client an API key next to `oauth`, or set `YOUTUBE_API_KEY`. A public read then goes out with the key while there is no usable token, and with the token afterwards.
+
+```ts
+const yt = new YouTube({ apiKey, oauth });
+
+await yt.videos.get(videoId); // works before and after sign-in
+```
+
 ### `INSUFFICIENT_SCOPE`
 
-**Cause.** The token was granted scopes, and none of them is accepted by the method. A token obtained for `youtube.readonly` cannot write. `youtube.upload` cannot add a video to a playlist. Comments need `youtube.force-ssl`.
+**Cause.** The token was granted scopes, and none of them is accepted by the method. A token obtained for `youtube.readonly` cannot write. `youtube.upload` cannot add a video to a playlist. Every comment method only accepts `youtube.force-ssl`.
+
+A public read is not refused when the client also has an API key: it falls back on the key. So this error on a read means the client has no key, or the read concerns the user, with `mine: true` for instance.
 
 **Fix.** Send the user through consent again with one of `error.scopes`. Scopes granted earlier are kept. In a script that uses `tokenFile`, test `oauth.grantedScopes` before deciding to skip `authorize()`. See [Scopes](/auth/scopes/).
 
@@ -78,9 +98,13 @@ The same code with the message "This OAuth2 client has no tokens yet" means the 
 **Fix.** Keep search for actual searches. The uploads of a channel, the videos of a playlist and a video by id all have cheaper methods that do not touch that bucket. [Quota](/basics/quota/#buckets) lists the buckets and the alternatives.
 
 ```ts
-yt.quota.remaining("search.list"); // calls left today, as far as this client knows
+// Calls left today, as far as this client knows.
+yt.quota.remaining("search.list");
 
-const latest = await yt.channels.latestVideos("@GoogleDevelopers", { limit: 10 }); // no search call
+// No search call: 2 units of the shared bucket, plus 1 for the handle.
+const latest = await yt.channels.latestVideos("@GoogleDevelopers", {
+  limit: 10,
+});
 ```
 
 ### `QUOTA_BUDGET_EXCEEDED`
@@ -91,6 +115,20 @@ const latest = await yt.channels.latestVideos("@GoogleDevelopers", { limit: 10 }
 
 ## Results that look wrong
 
+### A `list` call returns 5 items
+
+**Cause.** A raw `list` method sends what you give it. Without `maxResults`, an awaited call gets the API's default page: 5 items for most methods, 20 for comments and comment threads.
+
+**Fix.** Set `maxResults`, or walk the list: `for await`, `all()` and `take()` ask for the largest page the method allows. The helpers that return a list, such as `yt.channels.uploads`, `yt.playlists.items`, `yt.search.videos` or `yt.commentThreads.forVideo`, ask for full pages even when awaited: 50 items, 100 for comments. See [Lists](/basics/lists/).
+
+```ts
+const params = { part: "snippet", playlistId } as const;
+
+const five = await yt.playlistItems.list(params);
+const fifty = await yt.playlistItems.list({ ...params, maxResults: 50 });
+const alsoFifty = await yt.playlists.items(playlistId);
+```
+
 ### A channel is `null` for a `/c/` URL
 
 **Cause.** The API has no lookup for legacy `/c/name` URLs. `yt.channels.get` tries the name as a handle, then as a username. That is usually right, and sometimes the channel uses a different handle.
@@ -99,22 +137,23 @@ const latest = await yt.channels.latestVideos("@GoogleDevelopers", { limit: 10 }
 
 ### `subscriberCount` is `undefined`, or looks rounded
 
-**Cause.** A channel can hide its subscriber count. `statistics.hiddenSubscriberCount` is then `true` and `subscriberCount` is absent. When it is present, it is rounded by YouTube to three significant figures: this is the API, not the library.
+**Cause.** A channel can hide its subscriber count. `statistics.hiddenSubscriberCount` then says so, and `subscriberCount` is optional in the type for that case. When the count is present, the library hands over the string the API sent, unchanged: a count that looks rounded was sent that way.
 
-**Fix.** Handle both cases. No parameter turns the rounding off. See [Channels](/resources/channels/).
+**Fix.** Handle the missing case. The library has no setting that changes the number. See [Channels](/resources/channels/).
 
 ```ts
 const channel = await yt.channels.get("@GoogleDevelopers");
 
 if (channel) {
   const { hiddenSubscriberCount, subscriberCount } = channel.statistics;
-  console.log(hiddenSubscriberCount || subscriberCount === undefined ? "hidden" : formatCount(subscriberCount));
+  const hidden = hiddenSubscriberCount || subscriberCount === undefined;
+  console.log(hidden ? "hidden" : formatCount(subscriberCount));
 }
 ```
 
 ### `likeCount` or `commentCount` is `undefined`
 
-**Cause.** The owner can hide the like count. `commentCount` is absent when comments are turned off. Both are optional in the types for that reason.
+**Cause.** The API does not return these two fields for every video, which is why they are optional in the types.
 
 **Fix.** Treat `undefined` as "not shown", not as zero.
 
@@ -140,7 +179,8 @@ if (channel) {
 const video = await yt.videos.get(videoId, { part: "snippet" });
 
 if (video) {
-  await yt.videos.update({ body: { id: video.id, snippet: { ...video.snippet, title: "A better title" } } });
+  const snippet = { ...video.snippet, title: "A better title" };
+  await yt.videos.update({ body: { id: video.id, snippet } });
 }
 ```
 
@@ -159,7 +199,10 @@ if (video) {
 **Fix.** Force the consent screen, which makes Google send a refresh token again. Keep `accessType` at its default, `"offline"`. `authorize()` already does both.
 
 ```ts
-const { url } = await oauth.authUrl({ scopes: ["youtube.readonly"], prompt: "consent" });
+const { url } = await oauth.authUrl({
+  scopes: ["youtube.readonly"],
+  prompt: "consent",
+});
 ```
 
 Then store what `onTokens` receives. It is called after the exchange and after every refresh.
@@ -174,7 +217,7 @@ The error is a `YouTubeAuthError` with the code `OAUTH_ERROR` and `error.oauthEr
 - the user revoked the access, or the token was revoked with `oauth.revoke()`;
 - the consent screen of the project has the publishing status **Testing**. Google expires the refresh tokens of such an app after 7 days.
 
-**Fix.** Send the user through consent again. For the last cause, publish the app in the Google Cloud console so its tokens stop expiring. See [Credentials](/start/credentials/).
+**Fix.** Send the user through consent again. For the last cause, move the app out of the **Testing** status in the Google Cloud console. See [Credentials](/start/credentials/).
 
 ### `redirect_uri_mismatch`
 
@@ -194,7 +237,7 @@ A client created with a bare `accessToken` string fails differently when the tok
 
 ### The uploaded video is locked as private
 
-**Cause.** Videos uploaded by an unverified API project are locked as private until the project passes an audit. The upload itself succeeds.
+**Cause.** Videos uploaded through an unverified API project are locked as private until the project passes an audit. The upload itself succeeds.
 
 **Fix.** Request the audit for your project. The [FAQ](/help/faq/#how-do-i-get-more-quota) has the link to the form.
 
@@ -202,18 +245,26 @@ A client created with a bare `accessToken` string fails differently when the tok
 
 **Cause.** The connection dropped and the retries of a chunk ran out. The error is a `YouTubeUploadError` with the code `UPLOAD_FAILED`.
 
-**Fix.** The bytes already sent are not lost. Pass `error.sessionUri` back as `resumeUri` and the upload carries on from the last confirmed byte. A session stays valid for about a week. When `sessionUri` is `undefined`, there is nothing to resume: the file was small enough to go in one request, or the session expired. Start again.
+**Fix.** The bytes already sent are not lost. Pass `error.sessionUri` back as `resumeUri` and the upload carries on from the last confirmed byte, which `error.uploaded` reports. A session stays valid for about a week.
+
+When `sessionUri` is `undefined`, there is nothing to resume: the file was small enough to go in one request, no session could be opened, or the session expired. An expired session is reported the same way, as a `YouTubeUploadError` without `sessionUri`. Start again from the first byte.
 
 ```ts
 import { fileMedia } from "@ix-xs/youtube.api/node";
 
-const body = { snippet: { title: "Holiday 2026" }, status: { privacyStatus: "private" } } as const;
+const path = "./holiday.mp4";
+const body = {
+  snippet: { title: "Holiday 2026" },
+  status: { privacyStatus: "private" },
+} as const;
 
 try {
-  await yt.videos.insert({ body, media: await fileMedia("./holiday.mp4") });
+  await yt.videos.insert({ body, media: await fileMedia(path) });
 } catch (error) {
-  if (!(error instanceof YouTubeUploadError) || !error.sessionUri) throw error;
-  await yt.videos.insert({ body, media: await fileMedia("./holiday.mp4", { resumeUri: error.sessionUri }) });
+  if (!(error instanceof YouTubeUploadError)) throw error;
+  const resumeUri = error.sessionUri;
+  if (!resumeUri) throw error; // nothing to resume
+  await yt.videos.insert({ body, media: await fileMedia(path, { resumeUri }) });
 }
 ```
 
@@ -249,7 +300,7 @@ To resume after the process itself died, store the `sessionUri` that `onProgress
 
 **Cause.** Each read of the chat costs 5 units, and there is one every few seconds.
 
-**Fix.** Set `minInterval`. No message is lost with a longer interval: they arrive later, in larger batches. [Live chat](/live/live-chat/) has the arithmetic.
+**Fix.** Set `minInterval`. Each read continues from the page token of the previous one and asks for up to 2,000 messages, so a longer interval delivers the same messages later, in larger batches. [Live chat](/live/live-chat/) has the arithmetic.
 
 ## Notifications
 
@@ -282,7 +333,28 @@ If `subscribe()` itself throws, the hub refused the request: the error has the c
 
 **Cause.** A watcher reports videos published after it was created.
 
-**Fix.** Pass `since` with the moment to start from, for example the time of your last run. See [Watching uploads](/notifications/watching-uploads/).
+**Fix.** Pass `since` with the moment to start from. To catch up after a restart, give a time a few minutes before your last run, because the feed lags behind uploads, and skip the video ids you already handled. See [Watching uploads](/notifications/watching-uploads/).
+
+### The watcher reports "No channel found" once, then nothing
+
+**Cause.** A handle or a URL matched no channel. The watcher emits one `error` for it, then leaves that reference alone and looks it up again 6 hours later. Looking it up on every round would spend quota on a typo.
+
+**Fix.** Correct the reference and create the watcher again, or `remove()` the wrong one and `add()` the right one. The other channels keep being checked in the meantime.
+
+### The watcher's `error` event has an empty `channel`
+
+**Cause.** The payload is `{ channel, error }`. `channel` is the reference of the channel that could not be checked. It is an empty string when the error did not come from a channel: one of your own `video` or `poll` listeners threw, or returned a promise that rejected.
+
+**Fix.** Test `channel` before reporting, and look for the bug in your listener when it is empty.
+
+```ts
+const watcher = yt.watch(["@GoogleDevelopers"]);
+
+watcher.on("error", ({ channel, error }) => {
+  if (channel) console.warn(`Could not check ${channel}:`, error);
+  else console.warn("A listener failed:", error);
+});
+```
 
 ### "is not a channel id" from `new Watcher()`
 

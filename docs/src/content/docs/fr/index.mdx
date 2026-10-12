@@ -1,0 +1,51 @@
+---
+title: youtube.api
+description: Le client complet de l'API YouTube pour JavaScript et TypeScript, typé selon les parties que vous demandez.
+template: splash
+hero:
+  title: Toute l'API YouTube, <em>typée selon ce que vous demandez.</em>
+  tagline: Un seul client pour l'API Data, la diffusion en direct, Analytics et Reporting. Il parcourt les listes page par page, compte votre quota, rafraîchit les jetons OAuth, envoie les fichiers par morceaux avec reprise et vous prévient quand une chaîne publie. Aucune dépendance, et il fonctionne partout où fetch existe.
+  actions:
+    - text: Démarrage rapide
+      link: /start/quick-start/
+      variant: primary
+    - text: Toutes les méthodes
+      link: /reference/methods/
+      variant: secondary
+---
+
+import PartPicker from '../../../components/PartPicker.astro';
+
+<div class="at-landing not-content">
+
+<section class="at-section">
+  <header data-reveal><span>01</span><h2>Demandez une partie, recevez son type</h2></header>
+  <p data-reveal>YouTube ne renvoie que les parties demandées, et les types suivent. Cochez une partie : elle apparaît sur le résultat, avec ses champs. Décochez-la : la lire ne compile plus, au lieu de valoir undefined à l'exécution.</p>
+  <div data-reveal><PartPicker /></div>
+</section>
+
+<section class="at-section">
+  <header data-reveal><span>02</span><h2>Ce que vous n'écrivez plus</h2></header>
+  <ul class="at-points">
+    <li data-reveal><h3>Les boucles de jetons de page</h3><p>Chaque liste s'attend avec <code>await</code> pour une page ou se parcourt avec <code>for await</code>. Les pages sont demandées au fil de la lecture, à la taille qui coûte le moins.</p></li>
+    <li data-reveal><h3>Les paquets de 50 identifiants</h3><p>Passez 500 identifiants de vidéos. Ils sont répartis en appels, envoyés ensemble et réassemblés, dans l'ordre que vous avez donné.</p></li>
+    <li data-reveal><h3>L'analyse des handles et des URL</h3><p>Une chaîne, c'est un <code>@handle</code>, une URL quelconque ou un identifiant. De même pour les vidéos et les playlists. Un identifiant se résout gratuitement, un handle est retenu.</p></li>
+    <li data-reveal><h3>Les calculs de quota</h3><p><code>yt.quota</code> compte ce que vous dépensez par enveloppe et par méthode, sait quand le compteur repart à zéro et peut refuser un appel avant son envoi.</p></li>
+    <li data-reveal><h3>Le parcours OAuth</h3><p>URL de consentement avec PKCE, échange du code, rafraîchissement avant l'expiration et après un 401. Pour un script, un seul appel ouvre le navigateur et enregistre les jetons.</p></li>
+    <li data-reveal><h3>Le protocole d'envoi</h3><p>Donnez un fichier. Les petits partent en une requête, les gros par morceaux, avec progression, nouvelles tentatives et reprise.</p></li>
+  </ul>
+</section>
+
+<section class="at-section">
+  <header data-reveal><span>03</span><h2>Par où continuer</h2></header>
+  <ul class="at-paths">
+    <li data-reveal><a href="/start/quick-start/"><span>01</span><div><strong>Démarrage rapide</strong><small>Obtenez une clé, installez, puis lisez une chaîne et ses dernières vidéos en cinq minutes.</small></div></a></li>
+    <li data-reveal><a href="/basics/parts-and-types/"><span>02</span><div><strong>Bases</strong><small>Parties et types, listes, quota, erreurs, cache. Vingt minutes vite rentabilisées.</small></div></a></li>
+    <li data-reveal><a href="/auth/oauth/"><span>03</span><div><strong>Authentification</strong><small>OAuth pour les applications web, les scripts et les appareils, les scopes, et servir de nombreux utilisateurs.</small></div></a></li>
+    <li data-reveal><a href="/resources/uploads/"><span>04</span><div><strong>Envois</strong><small>Vidéos, miniatures et sous-titres, avec progression et reprise.</small></div></a></li>
+    <li data-reveal><a href="/notifications/watching-uploads/"><span>05</span><div><strong>Notifications</strong><small>Sachez quand une chaîne publie, par interrogation ou par push, pour peu ou pas de quota.</small></div></a></li>
+    <li data-reveal><a href="/reference/methods/"><span>06</span><div><strong>Référence</strong><small>Les 98 méthodes avec leur coût, tous les exports, les codes d'erreur, le dépannage.</small></div></a></li>
+  </ul>
+</section>
+
+</div>

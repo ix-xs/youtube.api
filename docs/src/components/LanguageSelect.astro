@@ -1,0 +1,30 @@
+---
+// The language switch: the codes of the languages side by side, the current
+// one marked, each a plain link to the same page in that language. A link and
+// not a menu: with two languages there is nothing to open.
+import { normalizeBase, switchLocale, withBase } from "../../plugins/base-links.mjs";
+import { LANGUAGES, useT } from "../i18n";
+
+const { locale } = Astro.locals.starlightRoute;
+const t = useT(locale);
+const base = normalizeBase(import.meta.env.BASE_URL);
+// The address of this page without the base, as the links of the site are written.
+// The "not found" page has no address of its own: from there, the switch goes home.
+const here = Astro.url.pathname.slice(base.length) || "/";
+const path = /^\/(?:[a-z]{2}\/)?404(?:\.html|\/)?$/.test(here) ? switchLocale("/", locale) : here;
+---
+
+<nav class="at-lang" aria-label={t("nav.language")}>
+  {LANGUAGES.map((language) => (
+    <a
+      href={withBase(switchLocale(path, language.locale), base)}
+      hreflang={language.code}
+      lang={language.code}
+      aria-current={language.locale === locale ? "true" : undefined}
+      title={language.label}
+    >
+      <span aria-hidden="true">{language.code.toUpperCase()}</span>
+      <span class="sr-only">{language.label}</span>
+    </a>
+  ))}
+</nav>

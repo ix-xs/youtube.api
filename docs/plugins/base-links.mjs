@@ -27,7 +27,7 @@ export function withBase(url, base) {
  * pages sit at the root of the content and of the site, a translation sits in
  * a folder named after its language, at the same paths.
  */
-export const LOCALES = [];
+export const LOCALES = ["fr"];
 
 /** The language of a content file ("fr"), or undefined for an English page. */
 export function localeOfFile(file) {

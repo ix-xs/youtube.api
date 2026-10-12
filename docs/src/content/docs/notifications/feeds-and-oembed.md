@@ -15,7 +15,7 @@ const info = await oEmbed("https://youtu.be/dQw4w9WgXcQ");
 console.log(info?.title, info?.authorName);
 ```
 
-Both are plain functions: no client, no key, no quota. Neither is part of the YouTube Data API, and YouTube guarantees neither. Use them where a missing answer is acceptable, and the API where it is not.
+Both are plain functions: no client, no key, no quota. Neither is part of the YouTube Data API, and YouTube does not guarantee the feed. Use them where a missing answer is acceptable, and the API where it is not.
 
 ## Reading a feed
 
@@ -26,7 +26,8 @@ const feed = await fetchFeed("UC_x5XG1OV2P6uZZ5FSM9Ttw");
 
 for (const entry of feed.entries) {
   console.log(entry.publishedAt, entry.title, entry.url);
-  console.log(entry.isShort ? "Short" : "Video", entry.views, entry.thumbnail?.url);
+  console.log(entry.isShort ? "Short" : "Video", entry.views);
+  console.log(entry.thumbnail?.url);
 }
 ```
 
@@ -43,7 +44,7 @@ There are always 15 entries at most, and no way to page further back. For a whol
 
 ## Only the Shorts, or only the long videos
 
-Every channel has auto-generated playlists: one with only its Shorts, one with only its regular videos, and others. `channelPlaylistId()` derives their ids without any call, and each of them has a feed.
+Every channel has playlists that YouTube generates: one with only its Shorts, one with only its regular videos, and others. `channelPlaylistId()` derives their ids without any call, and `fetchFeed` accepts them like any playlist id.
 
 ```ts
 const shorts = await fetchFeed(channelPlaylistId(channelId, "shorts"));
@@ -51,16 +52,7 @@ const longVideos = await fetchFeed(channelPlaylistId(channelId, "videos"));
 const liveStreams = await fetchFeed(channelPlaylistId(channelId, "live"));
 ```
 
-| Kind | Content |
-| --- | --- |
-| `"uploads"` (default) | Everything the channel uploaded |
-| `"videos"` | Uploads without Shorts and live streams |
-| `"shorts"` | Shorts only |
-| `"live"` | Live streams only |
-| `"popularVideos"`, `"popularShorts"`, `"popularLive"` | Popular videos, Shorts and live streams |
-| `"membersOnlyVideos"` | Members-only videos |
-
-Only `uploads` is documented by YouTube. The other kinds are not, but have been stable for years.
+[IDs and URLs](/basics/ids-and-urls/) lists the kinds. Only `uploads` is documented by YouTube.
 
 ## When a feed fails
 
@@ -79,13 +71,10 @@ try {
   const feed = await fetchFeed(channelId, { timeout: "10s" });
   console.log(feed.entries.length);
 } catch (error) {
-  if (isYouTubeError(error, "FEED_UNAVAILABLE")) {
-    // Ask the API instead: 1 unit, and a real answer.
-    const uploads = await yt.channels.uploads(channelId).take(15);
-    console.log(uploads.length);
-  } else {
-    throw error;
-  }
+  if (!isYouTubeError(error, "FEED_UNAVAILABLE")) throw error;
+  // Ask the API instead: 1 unit, and a real answer.
+  const uploads = await yt.channels.uploads(channelId).take(15);
+  console.log(uploads.length);
 }
 ```
 
@@ -103,14 +92,17 @@ const response = await fetch(url);
 const feed = parseFeed(await response.text());
 ```
 
-`parseFeed` throws a `YouTubeArgumentError` when the document is not an Atom feed.
+`feedUrl` throws a `YouTubeArgumentError` for anything but a channel id or a playlist id. `parseFeed` throws one when the document is not an Atom feed.
 
 ## Describing a video with oEmbed
 
 `oEmbed(url)` returns the title, the author, the thumbnail and ready-made embed markup for a video or playlist URL. A bare video id works too.
 
 ```ts
-const info = await oEmbed("https://www.youtube.com/watch?v=dQw4w9WgXcQ", { maxWidth: 640, maxHeight: 360 });
+const info = await oEmbed("https://www.youtube.com/watch?v=dQw4w9WgXcQ", {
+  maxWidth: 640,
+  maxHeight: 360,
+});
 
 if (info) {
   console.log(info.title, "by", info.authorName, info.authorUrl);
@@ -135,7 +127,17 @@ async function isWatchable(videoId: string): Promise<boolean> {
 
 Read the result the right way round. A non-null answer means the video exists, is not private and can be embedded. `null` covers three cases, and one of them is a video that exists with embedding turned off. When you must know which, ask `yt.videos.get()`, 1 unit.
 
-Anything else that goes wrong throws a `YouTubeRequestError`: `ABORTED` when your `signal` was aborted, `NETWORK` otherwise. That includes a timeout and an unexpected error status.
+Anything else that goes wrong throws a `YouTubeRequestError`. Check `error.code`:
+
+| Code | Meaning |
+| --- | --- |
+| `TIMEOUT` | No answer within `timeout`, 15 seconds by default |
+| `ABORTED` | Your `signal` was aborted |
+| `NETWORK` | YouTube could not be reached |
+| `SERVER_ERROR` | YouTube answered with a status the function does not expect: anything but a success, 400, 401, 403 or 404 |
+| `PARSE_ERROR` | YouTube answered with a success status and a body that is not JSON |
+
+The four statuses named in the `SERVER_ERROR` row are the ones that give `null`.
 
 ## Reference
 
@@ -158,7 +160,7 @@ Options of `fetchFeed` and `oEmbed`:
 | `fetch` | The global one | Custom `fetch` |
 | `maxWidth`, `maxHeight` | none | `oEmbed` only: largest player size, in pixels |
 
-`timeout` and `signal` work together for both functions: the request ends when it answers, when the timeout passes (code `TIMEOUT`) or when you abort it (code `ABORTED`).
+Both functions honour `timeout` and `signal` together: the request ends when it answers, when the timeout passes (code `TIMEOUT`) or when you abort it (code `ABORTED`).
 
 ### `Feed`
 
@@ -184,7 +186,7 @@ Options of `fetchFeed` and `oEmbed`:
 | `publishedAt` | `string` | ISO 8601 date the video went public |
 | `updatedAt` | `string` | ISO 8601 date of the last change to the entry |
 | `description` | `string` | |
-| `thumbnail` | `{ url, width, height } \| undefined` | |
+| `thumbnail` | `{ url, width, height } \| undefined` | `width` and `height` may be `undefined` |
 | `views` | `number \| undefined` | When the feed was generated |
 | `likes` | `number \| undefined` | When the feed was generated |
 

@@ -6,14 +6,18 @@ sidebar:
 ---
 
 ```ts
-const results = await yt.search.videos("lofi hip hop", { order: "viewCount", videoDuration: "long" }).take(10);
+const results = await yt.search
+  .videos("lofi hip hop", { order: "viewCount", videoDuration: "long" })
+  .take(10);
 
-for (const result of results) console.log(result.id.videoId, result.snippet.title);
+for (const result of results) {
+  console.log(result.id.videoId, result.snippet.title);
+}
 ```
 
 ## When not to search
 
-Search has [a quota bucket of its own](/basics/quota/#buckets): 100 calls a day by default, where everything else shares 10,000 units. Each page of results is one call. A hundred pages and you are done for the day.
+Search has [a quota bucket of its own](/basics/quota/#buckets): 100 calls a day by default. Each page of results is one call. A hundred pages and you are done for the day.
 
 So before searching, check whether another method answers the question:
 
@@ -22,8 +26,8 @@ So before searching, check whether another method answers the question:
 | What a channel uploaded | [`yt.channels.uploads`](/resources/channels/) or `latestVideos` | 1 or 2 units per 50 videos |
 | The videos of a playlist | [`yt.playlists.items`](/resources/playlists/) or `videos` | 1 or 2 units per 50 videos |
 | A video from its id or URL | [`yt.videos.get`](/resources/videos/) | 1 unit |
-| A channel from its handle or URL | [`yt.channels.get`](/resources/channels/) | 1 unit |
-| To know when a channel uploads | [`yt.watch`](/notifications/watching-uploads/) | No quota |
+| A channel from its handle or URL | [`yt.channels.get`](/resources/channels/) | 1 or 2 units |
+| To know when a channel uploads | [`yt.watch`](/notifications/watching-uploads/) | None from the public feed |
 
 Search is for what only search can do: finding things from words.
 
@@ -33,18 +37,24 @@ There is one helper per result type. Each takes the query, then the filters, and
 
 ```ts
 const videos = await yt.search.videos("typescript tutorial").take(10);
-for (const result of videos) console.log(result.id.videoId, result.snippet.title);
+for (const result of videos) {
+  console.log(result.id.videoId, result.snippet.title);
+}
 
 const [channel] = await yt.search.channels("Google for Developers").take(1);
 if (channel) console.log(channel.id.channelId, channel.snippet.title);
 
 const playlists = await yt.search.playlists("typescript course").take(5);
-for (const result of playlists) console.log(result.id.playlistId, result.snippet.title);
+for (const result of playlists) {
+  console.log(result.id.playlistId, result.snippet.title);
+}
 ```
 
 The results are typed by the helper. `result.id.videoId` is a `string` on the results of `videos`, `result.id.channelId` on those of `channels`, `result.id.playlistId` on those of `playlists`. No check is needed before using them.
 
 Each page fetched costs 1 call of the `search.list` bucket. `take(10)` asks for a page of 10, so it is one call. `take(120)` is three calls of 50.
+
+An empty query sends no search terms: `yt.search.videos("", { channelId })` lists by its filters alone.
 
 ## Finding live broadcasts
 
@@ -53,7 +63,10 @@ Each page fetched costs 1 call of the `search.list` bucket. `take(10)` asks for 
 ```ts
 const live = await yt.search.live("speedrun").take(5);
 
-for (const result of live) console.log(result.id.videoId, result.snippet.title, result.snippet.channelTitle);
+for (const result of live) {
+  const { title, channelTitle } = result.snippet;
+  console.log(result.id.videoId, title, channelTitle);
+}
 
 const onOneChannel = await yt.search.live("speedrun", { channelId }).take(5);
 ```
@@ -104,12 +117,14 @@ const recent = await yt.search
 | `topicId` | Topic id | Only results about this topic |
 | `location`, `locationRadius` | Strings | Only videos located within a distance of a point |
 | `forMine`, `forDeveloper`, `forContentOwner` | `true` | Restrict to the authenticated user's own videos, to those uploaded through your project, or to a content owner's. OAuth |
-| `maxResults` | 0-50, default 5 | Size of a page |
+| `maxResults` | 0-50 | Size of a page. Left out, the helpers ask for 50 |
 
-`location` and `locationRadius` go together:
+`location` and `locationRadius` go together. `location` is `"latitude,longitude"`, and `locationRadius` a distance such as `"10km"`:
 
 ```ts
-const nearby = await yt.search.videos("street food", { location: "48.8566,2.3522", locationRadius: "10km" }).take(10);
+const nearby = await yt.search
+  .videos("street food", { location: "48.8566,2.3522", locationRadius: "10km" })
+  .take(10);
 ```
 
 `yt.search.live` accepts the same filters except `eventType`, which it sets.
@@ -121,11 +136,18 @@ A search result is not a video. It carries an id and a snippet: `title`, `descri
 Pass the ids to `yt.videos.getMany` for the rest. That is 1 unit of the shared budget per 50 videos:
 
 ```ts
-const results = await yt.search.videos("lofi hip hop", { order: "viewCount" }).take(25);
-const found = await yt.videos.getMany(results.map((result) => result.id.videoId));
+const results = await yt.search
+  .videos("lofi hip hop", { order: "viewCount" })
+  .take(25);
+
+const videoIds = results.map((result) => result.id.videoId);
+const found = await yt.videos.getMany(videoIds);
 
 for (const video of found) {
-  console.log(video.snippet.title, formatDuration(video.contentDetails.duration), formatCount(video.statistics.viewCount));
+  const duration = formatDuration(video.contentDetails.duration);
+  const views = formatCount(video.statistics.viewCount);
+
+  console.log(video.snippet.title, duration, views);
 }
 ```
 
@@ -136,19 +158,18 @@ for (const video of found) {
 Awaiting a search gives one page, with the size of the whole result set as the API reports it:
 
 ```ts
-const page = await yt.search.videos("lofi hip hop", { maxResults: 50 });
+const page = await yt.search.videos("lofi hip hop");
 
 console.log(page.items.length); // up to 50
 console.log(page.totalResults); // an estimate
 console.log(page.nextPageToken);
 ```
 
-Two things to know about these numbers:
+Three things to know about these numbers:
 
+- An awaited helper asks for the largest page, 50, unless you pass `maxResults`. The raw `search.list` keeps the API's default, which is 5.
 - `totalResults` is an estimate, capped at 1,000,000. Do not show it as an exact count.
 - A query never returns more than about 500 results, whatever `totalResults` says. Walking a search to the end therefore costs about 10 calls, a tenth of the daily allowance.
-
-Without `maxResults`, an awaited page has the API's default size, which is 5. Iterating or using `take` picks the page size for you.
 
 Always bound a search:
 
@@ -162,14 +183,24 @@ const everything = await yt.search.videos("lofi hip hop").all();
 
 ## Using the raw `search.list`
 
-The helpers call `yt.search.list` with `part: "snippet"` and one `type`. Call it yourself to mix types, or to search without a query:
+The helpers call `yt.search.list` with `part: "snippet"` and one `type`. Call it yourself to mix types:
 
 ```ts
-const { items } = await yt.search.list({ part: "snippet", q: "typescript", type: ["video", "playlist"], maxResults: 25 });
+const { items } = await yt.search.list({
+  part: "snippet",
+  q: "typescript",
+  type: ["video", "playlist"],
+  maxResults: 25,
+});
 
 for (const result of items) {
-  if (result.id.videoId) console.log("video", result.id.videoId, result.snippet.title);
-  else if (result.id.playlistId) console.log("playlist", result.id.playlistId, result.snippet.title);
+  const { videoId, playlistId } = result.id;
+
+  if (videoId) {
+    console.log("video", videoId, result.snippet.title);
+  } else if (playlistId) {
+    console.log("playlist", playlistId, result.snippet.title);
+  }
 }
 ```
 
@@ -178,7 +209,9 @@ Here the three ids are optional in the type, since a result can be any of the re
 `q` is optional. This lists the newest videos of a channel, at the price of a search call. `yt.channels.uploads` does the same for 1 unit:
 
 ```ts
-const newest = await yt.search.list({ part: "snippet", channelId, type: "video", order: "date" }).take(10);
+const newest = await yt.search
+  .list({ part: "snippet", channelId, type: "video", order: "date" })
+  .take(10);
 ```
 
 ## Reference

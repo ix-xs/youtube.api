@@ -9,7 +9,8 @@ sidebar:
 const { items } = await yt.captions.list({ part: "snippet", videoId });
 
 for (const track of items) {
-  console.log(track.id, track.snippet.language, track.snippet.name, track.snippet.trackKind);
+  const { language, name, trackKind } = track.snippet;
+  console.log(track.id, language, name, trackKind);
 }
 ```
 
@@ -30,6 +31,8 @@ With the default 10,000 units a day, that is 25 uploads, or 40 rounds of listing
 All five methods need OAuth. An API key is never enough, not even to list the tracks of a public video: the call is refused before it is sent, with a `YouTubeAuthError` whose code is `MISSING_CREDENTIALS`.
 
 The scope is `youtube.force-ssl`. Content partners can use `youtubepartner` instead. The broader-looking `youtube` scope does not cover captions. [Scopes](/auth/scopes/) has the full table.
+
+The methods only work on videos the user can edit: see [Other people's videos](#other-peoples-videos).
 
 ## Listing the tracks of a video
 
@@ -54,7 +57,11 @@ The text of a track is not in the list. Fetch it with `download`.
 To look at specific tracks, pass their ids next to the video:
 
 ```ts
-const { items } = await yt.captions.list({ part: "snippet", videoId, id: [captionId] });
+const { items } = await yt.captions.list({
+  part: "snippet",
+  videoId,
+  id: [captionId],
+});
 ```
 
 ## Downloading a track
@@ -66,12 +73,16 @@ const original = await yt.captions.download({ id: captionId });
 const vtt = await yt.captions.download({ id: captionId, tfmt: "vtt" });
 ```
 
-Without `tfmt` you get the track in its original format. With it, YouTube converts the track. The accepted values are `"sbv"`, `"scc"`, `"srt"`, `"ttml"` and `"vtt"`.
+Without `tfmt` you get the track in the format it was uploaded in. With it, YouTube converts the track. The accepted values are `"sbv"`, `"scc"`, `"srt"`, `"ttml"` and `"vtt"`.
 
 `tlang` asks for a machine translation into another language:
 
 ```ts
-const french = await yt.captions.download({ id: captionId, tfmt: "srt", tlang: "fr" });
+const french = await yt.captions.download({
+  id: captionId,
+  tfmt: "srt",
+  tlang: "fr",
+});
 ```
 
 Finding a track and saving it to disk, for 250 units in total:
@@ -88,13 +99,9 @@ if (english) {
 }
 ```
 
-:::caution
-`download` only works on videos you can edit. See [Other people's videos](#other-peoples-videos).
-:::
-
 ## Uploading a track
 
-`captions.insert` adds a track to one of your videos. It costs 400 units. The body names the video, the language and the label. `media` is the caption file, and it must carry its own timing.
+`captions.insert` adds a track to one of your videos. It costs 400 units. The body names the video, the language and the label. `media` is the caption file, and it must carry its own timing: since April 2024 YouTube no longer syncs a transcript without timing.
 
 Pass the file as text, with its MIME type:
 
@@ -118,20 +125,20 @@ await yt.captions.insert({
 });
 ```
 
-A bare string also works as `media`. It is then sent as `text/plain`, so naming the format with `mimeType` is the safer habit. No MIME type is refused before sending for this method, and the file can be up to 100 MiB. [Uploads](/resources/uploads/) describes everything `media` accepts.
+A bare string also works as `media`. It is then sent as `text/plain`, so name the format with `mimeType` when it is something else. This method accepts any MIME type, and a file of up to 100 MiB. [Uploads](/resources/uploads/) describes everything `media` accepts.
 
-Two things you can set at upload time:
-
-- `isDraft: true` in the snippet keeps the track hidden from viewers until you publish it with `update`.
-- `sync: true`, next to `body` and `media`, asks YouTube to synchronize the track with the audio of the video. The track's `isAutoSynced` field then reads true. When it is false, YouTube uses the time codes of your file.
+`isDraft: true` in the snippet keeps the track hidden from viewers until you publish it with `update`:
 
 ```ts
 await yt.captions.insert({
-  body: { snippet: { videoId, language: "en", name: "English", isDraft: true } },
+  body: {
+    snippet: { videoId, language: "en", name: "English", isDraft: true },
+  },
   media: { body: srtText, mimeType: "application/x-subrip" },
-  sync: true,
 });
 ```
+
+The `sync` parameter of `insert` and `update` is still in the types, but it is no longer supported. Leave it out.
 
 ### Checking that the file was accepted
 
@@ -145,7 +152,7 @@ const track = await yt.captions.insert({
 });
 
 if (track.snippet.status === "failed") {
-  console.error("YouTube could not process the file:", track.snippet.failureReason);
+  console.error("Processing failed:", track.snippet.failureReason);
 }
 ```
 
@@ -158,7 +165,9 @@ if (track.snippet.status === "failed") {
 Publishing a draft:
 
 ```ts
-await yt.captions.update({ body: { id: captionId, snippet: { isDraft: false } } });
+await yt.captions.update({
+  body: { id: captionId, snippet: { isDraft: false } },
+});
 ```
 
 Replacing the file and publishing in one call:
@@ -170,7 +179,7 @@ await yt.captions.update({
 });
 ```
 
-`media` is optional here, and `sync` is accepted as on `insert`.
+`media` is optional here.
 
 ## Deleting a track
 
@@ -182,7 +191,7 @@ await yt.captions.delete({ id: captionId });
 
 ## Other people's videos
 
-This API does not give you the captions of a video you do not manage. `download` only works on videos you can edit, and `insert` adds tracks to your own videos. No method returns the caption text of someone else's video, whatever the scope of the token.
+The caption methods only work on videos the user can edit. No method returns the caption text of someone else's video, whatever the scope of the token.
 
 A refused call throws a `YouTubeApiError`. Handle it where a user can type any video id:
 
@@ -192,14 +201,15 @@ try {
   console.log(text);
 } catch (error) {
   if (error instanceof YouTubeApiError) {
-    console.error(`Captions not available (${error.status} ${error.reason ?? ""})`);
+    const why = `${error.status} ${error.reason ?? ""}`;
+    console.error(`Captions not available (${why})`);
   } else {
     throw error;
   }
 }
 ```
 
-A refused call is still billed, at least one unit.
+A refused call still counts: `yt.quota` adds one unit for it.
 
 ## Reference
 
@@ -209,8 +219,8 @@ A refused call is still billed, at least one unit.
 | --- | --- | --- |
 | `yt.captions.list({ part, videoId, id? })` | 50 | The tracks, in `items` |
 | `yt.captions.download({ id, tfmt?, tlang? })` | 200 | `string` |
-| `yt.captions.insert({ body, media, part?, sync? })` | 400 | The created track |
-| `yt.captions.update({ body, media?, part?, sync? })` | 450 | The updated track |
+| `yt.captions.insert({ body, media, part? })` | 400 | The created track |
+| `yt.captions.update({ body, media?, part? })` | 450 | The updated track |
 | `yt.captions.delete({ id })` | 50 | `void` |
 
 All of them accept `onBehalfOfContentOwner`, for YouTube content partners. All need OAuth with `youtube.force-ssl` or `youtubepartner`.
@@ -231,7 +241,7 @@ A caption has two parts: `id` and `snippet`. `snippet` is always returned when r
 | `failureReason` | `"unknownFormat" \| "unsupportedFormat" \| "processingFailed"` | Why processing failed. Only when `status` is `"failed"` |
 | `lastUpdated` | `string` | ISO 8601 date and time of the last update |
 | `isDraft` | `boolean` | A draft is not publicly visible |
-| `isAutoSynced` | `boolean` | YouTube synchronized the track to the audio, on request |
+| `isAutoSynced` | `boolean` | Whether YouTube synchronized the track to the audio. When false, the time codes of the file are used |
 | `isCC` | `boolean` | Closed captions for the deaf and hard of hearing |
 | `isEasyReader` | `boolean` | Written at a third-grade level, for language learners |
 | `isLarge` | `boolean` | Uses large text for the vision-impaired |

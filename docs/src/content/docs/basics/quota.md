@@ -25,11 +25,11 @@ Since June 2026 YouTube counts quota in buckets. Three methods have a bucket of 
 | `default` | Every Data API method not listed below | 10,000 units |
 | `search.list` | `yt.search.list` and the `yt.search` helpers | 100 calls |
 | `videos.insert` | `yt.videos.insert`, a video upload | 100 calls |
-| `videos.batchGetStats` | `yt.videos.batchGetStats` | 10,000 units, 1 per call |
+| `videos.batchGetStats` | `yt.videos.batchGetStats` | 10,000 calls |
 
-A call to one of the three methods costs 1 from its own bucket and nothing from `default`. So a search no longer competes with your reads and writes, but you only get 100 of them a day.
+A call to one of the three methods costs 1 from its own bucket and nothing from `default`. A search does not draw on the units of your reads and writes, but you only get 100 of them a day.
 
-The buckets reset together at midnight Pacific Time. `yt.quota.resetsAt` is that moment as a `Date`.
+The buckets reset at midnight Pacific Time. `yt.quota.resetsAt` is that moment as a `Date`.
 
 The Analytics and Reporting APIs are not billed in units. The tracker counts their calls under `analytics` and `reporting` for information, with no limit.
 
@@ -41,10 +41,12 @@ In the `default` bucket, the cost depends on the method, not on what it returns:
 
 | Kind of call | Cost | Examples |
 | --- | --- | --- |
-| A read | 1 unit | `videos.list`, `channels.list`, `playlistItems.list`, `commentThreads.list` |
+| Most reads | 1 unit | `videos.list`, `channels.list`, `playlistItems.list`, `commentThreads.list` |
+| Live broadcasts and streams, reads and writes | 1 unit | `liveBroadcasts.insert`, `liveBroadcasts.transition`, `liveStreams.update` |
 | A page of live chat | 5 units | `liveChatMessages.list` |
-| A live chat message | 20 units | `liveChatMessages.insert` |
-| A write | 50 units | `playlists.insert`, `playlistItems.insert`, `videos.update`, `videos.rate`, `commentThreads.insert`, `thumbnails.set` |
+| A live chat message, sent or deleted | 20 units | `liveChatMessages.insert`, `liveChatMessages.delete` |
+| Most writes | 50 units | `playlists.insert`, `playlistItems.insert`, `videos.update`, `videos.rate`, `commentThreads.insert`, `thumbnails.set` |
+| Live chat bans and moderators | 50 to 200 units | `liveChatModerators.list` 50, `liveChatModerators.insert` 200, `liveChatBans.insert` 200 |
 | Captions | 50 to 450 units | `captions.list` 50, `captions.download` 200, `captions.insert` 400, `captions.update` 450 |
 
 Three rules follow from that:
@@ -56,7 +58,8 @@ Three rules follow from that:
 [Quota costs](/reference/quota-costs/) has the cost of every method. `quotaCost()` gives the same numbers in code, and every method shows its cost in your editor.
 
 ```ts
-const { cost, bucket } = quotaCost("captions.insert"); // { cost: 400, bucket: "default" }
+const { cost, bucket } = quotaCost("captions.insert");
+// { cost: 400, bucket: "default" }
 ```
 
 ## Reading the count
@@ -82,7 +85,10 @@ The counters go back to zero on their own when the Pacific day changes.
 If your project has a different allowance, tell the tracker, so that `remaining()` and `canAfford()` are right:
 
 ```ts
-const yt = new YouTube({ apiKey, quota: { limits: { default: 50_000, "search.list": 500 } } });
+const yt = new YouTube({
+  apiKey,
+  quota: { limits: { default: 50_000, "search.list": 500 } },
+});
 ```
 
 ## Refusing a call before it is sent
@@ -90,23 +96,27 @@ const yt = new YouTube({ apiKey, quota: { limits: { default: 50_000, "search.lis
 By default the tracker only counts. With `enforce: true` it refuses a call that does not fit in what is left of its bucket. The call throws a `YouTubeQuotaBudgetError`, nothing is sent, and nothing is spent.
 
 ```ts
-const yt = new YouTube({ apiKey, quota: { enforce: true, limits: { default: 2000 } } });
+const yt = new YouTube({
+  apiKey,
+  quota: { enforce: true, limits: { default: 2000 } },
+});
 
 try {
-  await yt.videos.get(videoId);
+  await yt.videos.get(videoId); // 1 unit
 } catch (error) {
   if (error instanceof YouTubeQuotaBudgetError) {
-    console.log(`${error.cost} needed, ${error.remaining} left in "${error.bucket}"`);
-    console.log("Budget resets at", error.resetsAt.toISOString());
+    const { cost, remaining, bucket, resetsAt } = error;
+    console.log(`${cost} needed, ${remaining} left in "${bucket}"`);
+    console.log("Budget resets at", resetsAt.toISOString());
   } else {
     throw error;
   }
 }
 ```
 
-`limits` is your budget here, and it can be lower than what Google allows. Giving one service 2,000 of the 10,000 units leaves the rest to the others.
+`limits` is your budget here, and it can be lower than the allowance of the project. Giving one service 2,000 of the 10,000 units leaves the rest to the others.
 
-Calls in flight are held against the budget until they finish. Ten parallel writes with 120 units left do not all go through: two do, and eight are refused.
+Calls in flight are held against the budget until they finish. Ten parallel writes of 50 units with 120 units left do not all go through: two do, and eight are refused.
 
 ## When the real quota runs out
 
@@ -114,7 +124,7 @@ The API answers with an error, which the client throws as a `YouTubeApiError` wi
 
 ```ts
 try {
-  await yt.search.videos("lofi hip hop");
+  await yt.search.videos("lofi hip hop"); // 1 search call
 } catch (error) {
   if (isYouTubeError(error, "QUOTA_EXCEEDED")) {
     const wait = yt.quota.resetsAt.getTime() - Date.now();
@@ -142,7 +152,7 @@ What is counted:
 | Success | The cost of the method |
 | Answered from the [cache](/basics/caching/) | Nothing |
 | Revalidated with an ETag (a `304` answer) | The cost of the method |
-| Rejected by the API with a `4xx` status | 1 unit in the method's bucket. A rejected request is still billed |
+| Rejected by the API with a `4xx` status | 1 unit in the method's bucket. A rejected request still costs at least 1 unit |
 | `401`, or the quota error itself | Nothing |
 | Server error, timeout, network failure | Nothing |
 | Refused locally: missing credentials, missing scope, budget, invalid argument | Nothing. It was never sent |
@@ -152,12 +162,15 @@ What is counted:
 `yt.quota.snapshot()` returns the usage as plain data. Store it, and give it back through the `restore` option.
 
 ```ts
-const yt = new YouTube({ apiKey, quota: { enforce: true, restore: await db.loadQuota() } });
+const yt = new YouTube({
+  apiKey,
+  quota: { enforce: true, restore: await db.loadQuota() },
+});
 
 yt.on("quota", () => db.saveQuota(yt.quota.snapshot()));
 ```
 
-A snapshot carries the Pacific day it belongs to. One taken on an earlier day is ignored, so a restart after midnight Pacific Time begins at zero.
+A snapshot carries the Pacific day it belongs to. One taken on another day is ignored, so a restart after midnight Pacific Time begins at zero.
 
 ## Watching the spend
 
@@ -165,8 +178,10 @@ The client emits a `quota` event every time it charges something.
 
 ```ts
 yt.on("quota", ({ method, bucket, cost, used, remaining }) => {
-  console.log(`${method}: ${cost} from "${bucket}", ${used} used, ${remaining} left`);
-  if (bucket === "default" && remaining < 500) void notify("Less than 500 quota units left today");
+  console.log(`${method}: ${cost} from "${bucket}", ${used} used`);
+  if (bucket === "default" && remaining < 500) {
+    void notify("Less than 500 quota units left today");
+  }
 });
 ```
 
@@ -176,11 +191,16 @@ The `response` event carries the cost of each call too. [Configuration](/basics/
 
 ### Read the uploads playlist instead of searching
 
-"The videos of this channel" is not a search. Every channel has an uploads playlist, and reading it costs 1 unit of the shared bucket for 50 videos.
+"The videos of this channel" is not a search. Reading the channel's uploads playlist costs 1 unit of the shared bucket for 50 videos.
 
 ```ts
 // 1 search call, out of 100 a day.
-const found = await yt.search.list({ part: "snippet", channelId, type: "video", order: "date" });
+const found = await yt.search.list({
+  part: "snippet",
+  channelId,
+  type: "video",
+  order: "date",
+});
 
 // 1 unit, out of 10,000 a day.
 const uploads = await yt.channels.uploads(channelId).take(50);
@@ -199,7 +219,7 @@ One call takes 50 ids. Fetching 50 videos one by one costs 50 units, and togethe
 const videos = await yt.videos.getMany(ids); // 1 unit per 50 ids
 ```
 
-A search result is light. Take the ids from it and fetch the videos in one call, for 1 search and 1 unit.
+A search result carries a snippet and no duration or statistics. Take the ids from it and fetch the videos in one call, for 1 search and 1 unit.
 
 ### Ask for every part you need at once
 
@@ -215,20 +235,25 @@ With `cache: true`, a read repeated within five minutes costs nothing. Lists suc
 
 ### Poll statistics from their own bucket
 
-`videos.batchGetStats` returns fresh statistics for up to 50 videos per call, and draws from its own bucket: 10,000 units a day, 1 per call. A dashboard that refreshes view counts every minute then leaves the shared bucket alone.
+`videos.batchGetStats` returns fresh statistics for up to 50 videos per call, and draws from its own bucket: 10,000 calls a day. A dashboard that refreshes view counts every minute then leaves the shared bucket alone.
 
 ```ts
-const { items } = await yt.videos.batchGetStats({ part: "statistics", id: ids });
+const { items } = await yt.videos.batchGetStats({
+  part: "statistics",
+  id: ids,
+});
 
 for (const stat of items) console.log(stat.id, stat.statistics.viewCount);
 ```
 
 ### Do not poll the API for new uploads
 
-`yt.watch()` reads the public feed of each channel, which costs no quota. It only falls back on the API, at 1 unit per channel per round, while the feed is down. Push notifications through `websub` cost nothing either.
+`yt.watch()` reads the public feed of each channel, which costs no quota. It only falls back on the API, at 1 unit per channel per round, while the feed is down. A handle costs 1 unit to resolve, once. Push notifications through `websub` cost nothing either.
 
 ```ts
-const watcher = yt.watch(["@GoogleDevelopers", "@YouTube"], { interval: "5m" });
+const watcher = yt.watch(["@GoogleDevelopers", "@YouTube"], {
+  interval: "5m",
+});
 watcher.on("video", (video) => console.log(video.title, video.url));
 watcher.start();
 ```
@@ -255,9 +280,9 @@ Reading a live chat costs 5 units per request, every few seconds. The `minInterv
 | `limits` | `Record<QuotaBucket, number>` | Daily limits in effect, per bucket |
 | `resetsAt` | `Date` | The next midnight Pacific Time |
 | `remaining(bucket?)` | `number` | Units left today in a bucket. Default bucket: `"default"` |
-| `canAfford(cost, bucket?)` | `boolean` | Whether a call of `cost` units still fits |
+| `canAfford(cost, bucket?)` | `boolean` | Whether a call of `cost` units still fits. With `enforce`, the calls in flight are counted |
 | `snapshot()` | `QuotaSnapshot` | Usage as plain data, to store |
-| `restore(snapshot)` | `void` | Loads a snapshot. One from an earlier Pacific day is ignored |
+| `restore(snapshot)` | `void` | Loads a snapshot. One from another Pacific day is ignored |
 | `reset()` | `void` | Clears the counters |
 
 ### The `quota` option
@@ -276,7 +301,7 @@ Thrown only with `enforce: true`. Its `code` is `QUOTA_BUDGET_EXCEEDED`.
 | --- | --- | --- |
 | `bucket` | `string` | Bucket the call is charged to |
 | `cost` | `number` | Units the call would have cost |
-| `remaining` | `number` | Units left in the bucket |
+| `remaining` | `number` | Units left in the bucket, calls in flight deducted |
 | `resetsAt` | `Date` | When the bucket resets |
 
 ### The `quota` event
@@ -293,7 +318,7 @@ Thrown only with `enforce: true`. Its `code` is `QUOTA_BUDGET_EXCEEDED`.
 
 | Export | What it is |
 | --- | --- |
-| `quotaCost(method)` | `{ cost, bucket }` of a method. Throws a `YouTubeArgumentError` for an unknown name |
+| `quotaCost(method)` | `{ cost, bucket }` of a method. For the Analytics and Reporting APIs the cost is a plain call count. Throws a `YouTubeArgumentError` for an unknown name |
 | `nextQuotaReset(now?)` | The next midnight Pacific Time, as a `Date` |
 | `DEFAULT_QUOTA_LIMITS` | The default daily allowance of each bucket |
 

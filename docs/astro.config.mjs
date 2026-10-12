@@ -3,6 +3,7 @@ import { defineConfig } from "astro/config";
 import { unified } from "@astrojs/markdown-remark";
 import starlight from "@astrojs/starlight";
 import { normalizeBase, remarkBaseLinks, withBase } from "./plugins/base-links.mjs";
+import { rehypeSharedHeadingIds } from "./plugins/heading-ids.mjs";
 import { rehypeWrapTables } from "./plugins/wrap-tables.mjs";
 import { atelierDark, atelierLight } from "./src/styles/code-themes.mjs";
 
@@ -27,7 +28,7 @@ const exists = (slug) => ["md", "mdx"].some((extension) => existsSync(new URL(`.
 const pages = (...slugs) => slugs.filter((slug) => !draft || exists(slug)).map((slug) => ({ slug }));
 
 /** One section of the sidebar, listing every page of a folder in its own order. */
-const section = (label, directory, collapsed = true) => ({ label, collapsed, items: [{ autogenerate: { directory } }] });
+const section = (label, fr, directory, collapsed = true) => ({ label, translations: { fr }, collapsed, items: [{ autogenerate: { directory } }] });
 
 // https://starlight.astro.build/reference/configuration/
 export default defineConfig({
@@ -37,12 +38,20 @@ export default defineConfig({
     // The two plugins below are written for unified, not for Astro's default processor.
     processor: unified({
       remarkPlugins: [[remarkBaseLinks, { base }]],
-      rehypePlugins: [rehypeWrapTables],
+      rehypePlugins: [rehypeSharedHeadingIds, rehypeWrapTables],
     }),
   },
   integrations: [
     starlight({
       title: "youtube.api",
+      // English is the original and keeps the addresses it always had; a
+      // translation lives under its language code. A page that is not
+      // translated yet falls back to English, with a notice.
+      defaultLocale: "root",
+      locales: {
+        root: { label: "English", lang: "en" },
+        fr: { label: "Français", lang: "fr" },
+      },
       description:
         "The complete YouTube API client for JavaScript and TypeScript: every Data API v3, Live Streaming, Analytics and Reporting method, typed by the parts you request. Pagination, quota tracking, OAuth 2.0, resumable uploads, live chat and upload notifications, with no dependency.",
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/ix-xs/youtube.api" }],
@@ -68,6 +77,7 @@ export default defineConfig({
       components: {
         Header: "./src/components/Header.astro",
         ThemeSelect: "./src/components/ThemeSelect.astro",
+        LanguageSelect: "./src/components/LanguageSelect.astro",
         PageTitle: "./src/components/PageTitle.astro",
         Hero: "./src/components/Hero.astro",
       },
@@ -104,17 +114,19 @@ export default defineConfig({
       sidebar: [
         {
           label: "Start",
-          items: [{ label: "Introduction", slug: "index" }, ...pages("start/quick-start", "start/credentials", "start/migrating-from-v1")],
+          translations: { fr: "Démarrer" },
+          items: [{ label: "Introduction", translations: { fr: "Introduction" }, slug: "index" }, ...pages("start/quick-start", "start/credentials", "start/migrating-from-v1")],
         },
-        section("Basics", "basics", false),
-        section("Authentication", "auth"),
-        section("Resources", "resources"),
-        section("Live", "live"),
-        section("Notifications", "notifications"),
-        section("Analytics", "analytics"),
-        section("Recipes", "recipes"),
+        section("Basics", "Bases", "basics", false),
+        section("Authentication", "Authentification", "auth"),
+        section("Resources", "Ressources", "resources"),
+        section("Live", "Direct", "live"),
+        section("Notifications", "Notifications", "notifications"),
+        section("Analytics", "Analytics", "analytics"),
+        section("Recipes", "Recettes", "recipes"),
         {
           label: "Reference",
+          translations: { fr: "Référence" },
           collapsed: true,
           items: pages("reference/methods", "reference/quota-costs", "reference/errors", "reference/exports", "reference/runtimes", "help/troubleshooting", "help/faq"),
         },

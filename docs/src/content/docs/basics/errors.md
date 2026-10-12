@@ -1,6 +1,6 @@
 ---
 title: Errors
-description: A failed call throws an error with a stable code and, when the API answered, the reason it gave. Rate limits, server errors and network failures are retried before anything is thrown.
+description: A failed call throws an error with a stable code and, when the API answered, the reason it gave. Rate limits are retried, and so are server errors and network failures on reads, before anything is thrown.
 sidebar:
   order: 4
 ---
@@ -28,13 +28,13 @@ Everything the library throws extends `YouTubeError` and carries a `code`. The c
 | Class | Thrown when | Sent to the API |
 | --- | --- | --- |
 | `YouTubeApiError` | The API answered with an error status | Yes |
-| `YouTubeRequestError` | No usable response: timeout, network failure, abort, unreadable body, feed unavailable | Maybe |
+| `YouTubeRequestError` | No usable response: timeout, network failure, abort, unreadable body, feed or WebSub hub failure | Maybe |
 | `YouTubeUploadError` | A media upload could not be completed | Yes |
 | `YouTubeAuthError` | Credentials are missing or insufficient, or an OAuth exchange failed | No, except for the OAuth exchange |
-| `YouTubeArgumentError` | An argument was rejected before anything was sent | No |
+| `YouTubeArgumentError` | An argument cannot be right, or a reference matched nothing: a handle with no channel, a video with no live chat | No, except the lookup that matched nothing |
 | `YouTubeQuotaBudgetError` | The call would go over the budget you set with `quota.enforce` | No |
 
-The last three cost no quota: the call never left your process. [Credentials](/start/credentials/) covers the auth checks and [Quota](/basics/quota/) the budget.
+A call that was not sent costs no quota. [Credentials](/start/credentials/) covers the auth checks and [Quota](/basics/quota/) the budget.
 
 ## Branching on the code
 
@@ -79,22 +79,23 @@ The reference at the end of this page lists every code.
 
 ## Branching on the reason
 
-A code says what kind of failure it is. The `reason` of a `YouTubeApiError` says exactly what the API objected to. It is the string YouTube puts in its error body.
+A code says what kind of failure it is. The `reason` of a `YouTubeApiError` says what the API objected to. It is the `reason` of the first entry of the error body. When the body carries a more precise one in its details, an invalid key or a missing scope for instance, that one is used.
 
 ```ts
 try {
   await yt.videos.rate({ id: videoId, rating: "like" }); // 50 units
 } catch (error) {
-  if (error instanceof YouTubeApiError) {
-    if (error.reason === "videoRatingDisabled") console.log("Ratings are turned off on that video");
-    else console.log(error.status, error.reason, error.message);
+  if (!(error instanceof YouTubeApiError)) throw error;
+
+  if (error.reason === "videoRatingDisabled") {
+    console.log("Ratings are turned off on that video");
   } else {
-    throw error;
+    console.log(error.status, error.reason, error.message);
   }
 }
 ```
 
-`error.reason` is typed with the reasons worth branching on, so your editor completes them. The type stays open: the API can return a reason that is not in the list.
+`error.reason` is typed with the reasons worth branching on, so your editor completes them. The type stays open: the API can return a reason that is not in the list. [Error codes](/reference/errors/) explains each reason.
 
 A `YouTubeApiError` has three shortcuts for the cases you will handle most:
 
@@ -136,9 +137,9 @@ A rate limit means the call was not processed, so anything can be sent again. A 
 
 By default there are 3 retries. The delay starts at 500 ms and doubles each time, up to 30 seconds. The client waits a random time between half of that delay and all of it, so many clients do not retry in step. When the API sends a `Retry-After` header, that value is used instead. If it is longer than `maxDelay`, the call is not retried: the error is thrown at once with its `retryAfter`, so you decide whether to wait.
 
-One more case is handled apart. On a `401`, a client created with `oauth` refreshes the access token once and sends the call again. That does not count as a retry.
+One more case is handled apart. On a `401`, a client whose `OAuth2` has a refresh token refreshes the access token once and sends the call again. That does not count as a retry.
 
-A resumable upload applies the same policy to each chunk and resumes from the byte the server confirmed. See [Uploads](/resources/uploads/).
+A resumable upload uses the same number of attempts and the same delays for each chunk, and resumes from the byte the server confirmed. See [Uploads](/resources/uploads/).
 
 ## Tuning retries and timeouts
 
@@ -158,7 +159,7 @@ await yt.videos.get(videoId, { retry: false, timeout: "3s" });
 await yt.videos.get(videoId, { retry: { attempts: 1 } });
 ```
 
-`timeout` is the time allowed for one attempt, `"30s"` by default. A call that is retried three times can therefore take four timeouts plus the waits. A timeout throws a `YouTubeRequestError` with the code `TIMEOUT`. Uploads are not subject to it.
+`timeout` is the time allowed for one attempt, `"30s"` by default, and `0` turns it off. A call that is retried three times can therefore take four timeouts plus the waits. A timeout throws a `YouTubeRequestError` with the code `TIMEOUT`. Uploads, report downloads and the live chat stream are not subject to it: give those a `signal`.
 
 The `retry` event fires before each wait:
 
@@ -175,9 +176,10 @@ Pass a `signal`. Aborting it stops the request, or the wait between two retries,
 ```ts
 const controller = new AbortController();
 setTimeout(() => controller.abort(), 5_000);
+const { signal } = controller;
 
 try {
-  for await (const item of yt.playlists.items(playlistId, { signal: controller.signal })) {
+  for await (const item of yt.playlists.items(playlistId, { signal })) {
     console.log(item.snippet.title);
   }
 } catch (error) {
@@ -193,11 +195,11 @@ await yt.videos.get(videoId, { signal: AbortSignal.timeout(15_000) });
 
 ## What an error contains
 
-The message starts with the method that failed, `videos.list: `, followed by what the API said. A `YouTubeApiError` also carries the rest of the answer.
+The message of a `YouTubeApiError` or a `YouTubeRequestError` starts with the method that failed, `videos.list: `, followed by what went wrong. A `YouTubeApiError` also carries the rest of the answer.
 
 ```ts
 try {
-  await yt.videos.get(videoId);
+  await yt.videos.get(videoId); // 1 unit
 } catch (error) {
   if (error instanceof YouTubeApiError) {
     console.error({
@@ -215,7 +217,7 @@ try {
 
 `error.url` has credentials removed, so it is safe to log. The same goes for the URLs in the client's events. The API key is not in the URL to begin with: it travels in a header.
 
-A `YouTubeRequestError` keeps the underlying failure in `error.cause`.
+An error that wraps another failure, a network error for instance, keeps it in `error.cause`.
 
 ## Reference
 
@@ -230,58 +232,22 @@ A `YouTubeRequestError` keeps the underlying failure in `error.cause`.
 | `CONFLICT` | `YouTubeApiError` | Status 409 |
 | `QUOTA_EXCEEDED` | `YouTubeApiError` | Reason `quotaExceeded` or `dailyLimitExceeded` |
 | `RATE_LIMITED` | `YouTubeApiError` | Status 429, or reason `rateLimitExceeded` or `userRateLimitExceeded` |
-| `SERVER_ERROR` | `YouTubeApiError` | Status 500 and above |
+| `SERVER_ERROR` | `YouTubeApiError` | Status 500 and above. Also a `YouTubeRequestError` when `oEmbed` gets an error status |
 | `API_ERROR` | `YouTubeApiError` | Any other error status |
 | `TIMEOUT` | `YouTubeRequestError` | No response within `timeout` |
 | `NETWORK` | `YouTubeRequestError` | The request could not be made |
 | `ABORTED` | `YouTubeRequestError` | Your `signal` aborted |
 | `PARSE_ERROR` | `YouTubeRequestError` | The response is not valid JSON |
 | `FEED_UNAVAILABLE` | `YouTubeRequestError` | The public feed of a channel or playlist could not be read |
+| `HUB_ERROR` | `YouTubeRequestError` | The WebSub hub answered a subscription request with an error status |
 | `UPLOAD_FAILED` | `YouTubeUploadError` | A media upload could not be completed |
 | `MISSING_CREDENTIALS` | `YouTubeAuthError` | No credentials, or the call needs OAuth and there is no token |
 | `INSUFFICIENT_SCOPE` | `YouTubeAuthError` | The token has none of the scopes the method accepts |
 | `OAUTH_ERROR` | `YouTubeAuthError` | An OAuth request failed, or the access token expired and there is no refresh token |
-| `INVALID_ARGUMENT` | `YouTubeArgumentError` | An argument was rejected before anything was sent |
+| `INVALID_ARGUMENT` | `YouTubeArgumentError` | An argument cannot be right, or a reference matched nothing |
 | `QUOTA_BUDGET_EXCEEDED` | `YouTubeQuotaBudgetError` | The call does not fit in the budget of `quota.enforce` |
 
-[Errors](/reference/errors/) in the reference section has the full table of codes.
-
-### Fields
-
-| Class | Field | Type | What it is |
-| --- | --- | --- | --- |
-| Every error | `code` | `YouTubeErrorCode` | Stable code |
-| Every error | `message` | `string` | Readable description |
-| `YouTubeApiError` | `status` | `number` | HTTP status code |
-| | `reason` | `YouTubeErrorReason \| undefined` | First reason of the error body |
-| | `errors` | `ApiErrorDetail[]` | Every error entry the API returned |
-| | `apiStatus` | `string \| undefined` | gRPC-style status, for example `PERMISSION_DENIED` |
-| | `method` | `string` | Method that failed, for example `videos.list` |
-| | `url` | `string` | Request URL with credentials removed |
-| | `retryAfter` | `number \| undefined` | Seconds to wait, when the API said so |
-| | `body` | `unknown` | Parsed response body, when there was one |
-| `YouTubeRequestError` | `method` | `string` | Method that failed |
-| `YouTubeAuthError` | `scopes` | `readonly string[]` | Scopes that would have allowed the call, when known |
-| | `oauthError` | `string \| undefined` | OAuth error name returned by Google, for example `invalid_grant` |
-| `YouTubeQuotaBudgetError` | `bucket`, `cost`, `remaining`, `resetsAt` | | The bucket, what the call costs, what is left, and when it resets |
-| `YouTubeUploadError` | `sessionUri` | `string \| undefined` | Resumable session, to pass back as `resumeUri` |
-| | `uploaded` | `number` | Bytes the server confirmed |
-
-### Common reasons
-
-| Group | `error.reason` |
-| --- | --- |
-| Quota | `quotaExceeded`, `dailyLimitExceeded` |
-| Rate limit | `rateLimitExceeded`, `userRateLimitExceeded` |
-| Key and project | `keyInvalid`, `keyExpired`, `accessNotConfigured`, `ipRefererBlocked` |
-| Authorization | `authError`, `required`, `forbidden`, `insufficientPermissions` |
-| Account and channel | `youtubeSignupRequired`, `accountClosed`, `accountSuspended`, `channelClosed`, `channelSuspended`, `emailNotVerified` |
-| Request | `badRequest`, `invalid`, `invalidParameter`, `missingRequiredParameter`, `incompatibleParameters`, `invalidPageToken`, `invalidFilters`, `unknownPart` |
-| Not found | `notFound`, `videoNotFound`, `channelNotFound`, `playlistNotFound`, `playlistItemNotFound`, `commentNotFound`, `commentThreadNotFound`, `subscriptionNotFound`, `captionNotFound`, `liveChatNotFound`, `liveBroadcastNotFound`, `liveStreamNotFound` |
-| Turned off | `commentsDisabled`, `videoRatingDisabled`, `liveChatDisabled`, `liveChatEnded` |
-| Playlists and subscriptions | `playlistForbidden`, `playlistContainsMaximumNumberOfVideos`, `videoAlreadyInPlaylist`, `subscriptionDuplicate`, `subscriptionForbidden` |
-| Video metadata and uploads | `invalidTitle`, `invalidDescription`, `invalidTags`, `invalidCategoryId`, `invalidVideoMetadata`, `defaultLanguageNotSet`, `uploadLimitExceeded` |
-| Server | `processingFailure`, `backendError`, `internalError`, `serviceUnavailable` |
+[Error codes](/reference/errors/) says, for each code, what is retried and what to do. It also lists every reason and the fields of each error class.
 
 ### Retry and timeout options
 
@@ -291,14 +257,16 @@ These exist on the client and on every call.
 | --- | --- | --- | --- |
 | `retry.attempts` | `number` | `3` | Retries after the first attempt. `0` turns retries off |
 | `retry.delay` | `Duration` | `"500ms"` | First delay, doubled on each retry |
-| `retry.maxDelay` | `Duration` | `"30s"` | Upper bound of a single delay |
+| `retry.maxDelay` | `Duration` | `"30s"` | Upper bound of a single delay. A longer `Retry-After` is not waited for |
 | `retry` | `false` | | Turns retries off |
-| `timeout` | `Duration` | `"30s"` | Time allowed for one attempt |
+| `timeout` | `Duration` | `"30s"` | Time allowed for one attempt. `0` turns it off |
 | `signal` | `AbortSignal` | | Cancels the call. Per call only |
+
+A per-call `retry` only replaces the fields it sets.
 
 ## See also
 
-- [Errors](/reference/errors/) in the reference section: the full table of codes.
+- [Error codes](/reference/errors/): every code, every reason and the fields of each class.
 - [Quota](/basics/quota/): `QUOTA_EXCEEDED`, and how not to get there.
 - [Credentials](/start/credentials/): the calls that are refused before they are sent.
 - [Troubleshooting](/help/troubleshooting/): the errors people meet first.

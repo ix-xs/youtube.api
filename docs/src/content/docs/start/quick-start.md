@@ -1,6 +1,6 @@
 ---
 title: Quick start
-description: Install the package, get an API key, and read a channel, its latest videos and a playlist. Five minutes, no OAuth.
+description: Install the package, get an API key, and read a channel, its latest videos and a playlist. No OAuth needed.
 ---
 
 ```ts
@@ -8,7 +8,7 @@ import { YouTube } from "@ix-xs/youtube.api";
 
 const yt = new YouTube({ apiKey: process.env.YOUTUBE_API_KEY });
 
-const channel = await yt.channels.get("@GoogleDevelopers");
+const channel = await yt.channels.get("@GoogleDevelopers"); // 1 unit
 console.log(channel?.snippet.title, channel?.statistics.subscriberCount);
 ```
 
@@ -18,7 +18,7 @@ console.log(channel?.snippet.title, channel?.statistics.subscriberCount);
 npm install @ix-xs/youtube.api
 ```
 
-It needs Node.js 20 or newer and has no dependency. It also runs in Bun, Deno, browsers and edge runtimes: see [Runtimes](/reference/runtimes/).
+It needs Node.js 20 or newer and has no dependency. For Bun, Deno, browsers and edge runtimes, see [Runtimes](/reference/runtimes/).
 
 Both module systems work:
 
@@ -32,26 +32,24 @@ const { YouTube } = require("@ix-xs/youtube.api");
 
 ## Get an API key
 
-An API key is enough to read anything public. It takes two minutes:
+An API key is enough to read public data. Create one in the [Google Cloud console](https://console.cloud.google.com/): enable **YouTube Data API v3** for a project, then create a key in **APIs & Services > Credentials**.
 
-1. Open the [Google Cloud console](https://console.cloud.google.com/) and create a project, or pick one.
-2. In **APIs & Services > Library**, enable **YouTube Data API v3**.
-3. In **APIs & Services > Credentials**, choose **Create credentials > API key**.
-
-Keep the key out of your code. Put it in an environment variable named `YOUTUBE_API_KEY`: the client reads it when you pass nothing.
+Keep the key out of your code. Put it in an environment variable named `YOUTUBE_API_KEY`: the client reads it when you pass no `apiKey`.
 
 ```ts
 const yt = new YouTube(); // uses process.env.YOUTUBE_API_KEY
 ```
 
-[Credentials](/start/credentials/) covers restricting the key, and what needs OAuth instead.
+[Credentials](/start/credentials/) has the steps, how to restrict the key, and what needs OAuth instead.
 
 ## Read a channel
 
-A channel can be given as a handle, a URL or an id. The result is `null` when nothing matches.
+A channel can be given as an id, an `@handle`, a legacy username or a URL. The call costs 1 unit and resolves to `null` when nothing matches.
 
 ```ts
-const channel = await yt.channels.get("https://www.youtube.com/@GoogleDevelopers");
+const channel = await yt.channels.get(
+  "https://www.youtube.com/@GoogleDevelopers",
+);
 
 if (channel) {
   console.log(channel.id); // "UC_x5XG1OV2P6uZZ5FSM9Ttw"
@@ -63,19 +61,24 @@ if (channel) {
 ## Read its latest videos
 
 ```ts
-const videos = await yt.channels.latestVideos("@GoogleDevelopers", { limit: 5 });
+const videos = await yt.channels.latestVideos("@GoogleDevelopers", {
+  limit: 5,
+});
 
 for (const video of videos) {
   console.log(video.snippet.title);
-  console.log(formatDuration(video.contentDetails.duration), formatCount(video.statistics.viewCount));
+  console.log(
+    formatDuration(video.contentDetails.duration),
+    formatCount(video.statistics.viewCount),
+  );
 }
 ```
 
-This reads the channel's uploads playlist, then fetches the videos: 2 quota units for up to 50 videos, plus 1 the first time a handle is resolved. A search would cost one of your 100 daily search calls and return less.
+This reads the channel's uploads playlist, then fetches the videos: 2 quota units for up to 50 videos, plus 1 the first time a handle is resolved. A search would take one of your 100 daily search calls and return no durations or statistics.
 
 ## Walk a list
 
-Every `list` method, and every helper that returns a list, can be awaited for one page or iterated to the end.
+Every `list` method, and every helper that returns a list, can be awaited for one page or iterated to the end. A page of `yt.playlists.items` holds up to 50 items and costs 1 unit.
 
 ```ts
 // One page.
@@ -93,7 +96,7 @@ const firstHundred = await yt.playlists.items("PLBCF2DAC6FFB574DE").take(100);
 
 ## Use the raw API
 
-The helpers above are shortcuts. Every method of the API is there under the name the official reference gives it, with typed parameters:
+The helpers above are shortcuts. Every method of the API is also there under its own name, with typed parameters. [Every method](/reference/methods/) lists them.
 
 ```ts
 const { items } = await yt.videos.list({
@@ -101,18 +104,18 @@ const { items } = await yt.videos.list({
   chart: "mostPopular",
   regionCode: "FR",
   maxResults: 10,
-});
+}); // 1 unit
 ```
 
-The result type follows `part`: here each video has `snippet` and `statistics`, and nothing else. That is the subject of [Parts and types](/basics/parts-and-types/).
+The result type follows `part`: here each video has `id`, `snippet` and `statistics`, and reading another part does not compile. That is the subject of [Parts and types](/basics/parts-and-types/).
 
 ## Handle errors
 
-A failed call throws. The error says what happened in a form you can branch on.
+A failed call throws. The error carries a `code` you can branch on.
 
 ```ts
 try {
-  await yt.videos.get(videoId);
+  await yt.videos.get(videoId); // 1 unit
 } catch (error) {
   if (isYouTubeError(error, "QUOTA_EXCEEDED")) {
     console.log("Out of quota until", yt.quota.resetsAt);
@@ -122,10 +125,11 @@ try {
 }
 ```
 
-## Where to go next
+[Errors](/basics/errors/) lists the codes and says what is retried.
+
+## See also
 
 - [Parts and types](/basics/parts-and-types/): how the result types are built.
 - [Lists](/basics/lists/): pages, iteration, limits.
 - [Quota](/basics/quota/): what calls cost and how to spend less.
 - [OAuth](/auth/oauth/): private data and writes.
-- [Every method](/reference/methods/): the whole API on one page.

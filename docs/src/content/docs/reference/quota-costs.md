@@ -14,7 +14,7 @@ Calls to these are not counted in units of the shared budget. Each has a daily a
 | Method | Default allowance | Cost of a call |
 | --- | --- | --- |
 | `yt.search.list` | 100 calls a day | 1 |
-| `yt.videos.batchGetStats` | 10,000 units a day | 1 |
+| `yt.videos.batchGetStats` | 10,000 calls a day | 1 |
 | `yt.videos.insert` | 100 calls a day | 1 |
 
 ## Shared budget

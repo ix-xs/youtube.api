@@ -27,13 +27,13 @@ Every field is optional. `new YouTube()` with no argument reads the `YOUTUBE_API
 
 | Option | Type | Default | What it does |
 | --- | --- | --- | --- |
-| `apiKey` | `string` | `YOUTUBE_API_KEY`, when no credentials are given | API key, enough to read public data |
+| `apiKey` | `string` | The `YOUTUBE_API_KEY` environment variable | API key, enough to read public data |
 | `oauth` | `OAuth2 \| OAuth2Options` | None | OAuth 2.0 client that keeps tokens fresh, or the options to build one |
 | `accessToken` | `string \| (() => string \| Promise<string>)` | None | A ready-made access token, or a function that returns one. No automatic refresh |
 | `cache` | `boolean \| CacheOptions` | Off | Caches successful reads. `true` keeps them 5 minutes in memory |
 | `quota` | `QuotaOptions` | Default limits, not enforced | Daily limits, optional enforcement and restored usage |
-| `retry` | `RetryOptions \| false` | 3 retries, from `"500ms"`, doubling up to `"30s"` | Retries on rate limits, server errors and network failures |
-| `timeout` | `Duration` | `"30s"` | Time allowed for one attempt. Uploads are not subject to it |
+| `retry` | `RetryOptions \| false` | 3 retries, from `"500ms"`, doubling up to `"30s"` | Retries on rate limits, server errors and network failures. `false` turns them off |
+| `timeout` | `Duration` | `"30s"` | Time allowed for one attempt. `0` turns it off. Uploads, report downloads and the live chat stream are not subject to it |
 | `fetch` | `typeof fetch` | The global `fetch` | Custom `fetch`, for a proxy, an instrumented client or tests |
 | `baseUrl` | `string` | `https://youtube.googleapis.com/` | Root of the Data API, to go through a proxy |
 | `headers` | `Record<string, string>` | None | Headers added to every request |
@@ -47,21 +47,24 @@ Each group has its own page: [Credentials](/start/credentials/) for the first th
 Every API call takes request options as its last argument. They apply to that call only and win over the client's.
 
 ```ts
-const controller = new AbortController();
+const { signal } = new AbortController();
 
-// Raw methods: after the parameters.
-await yt.videos.list({ part: "snippet", id: videoId }, { timeout: "5s", retry: false });
+// Raw methods: after the parameters. 1 unit.
+await yt.videos.list(
+  { part: "snippet", id: videoId },
+  { timeout: "5s", retry: false },
+);
 
-// Helpers: in the same object as their own options.
+// Most helpers: in the same object as their own options. 1 unit, then 50.
 await yt.videos.get(videoId, { part: "statistics", cache: false });
-await yt.playlists.add(playlistId, videoId, { position: 0, signal: controller.signal }); // 50 units
+await yt.playlists.add(playlistId, videoId, { position: 0, signal });
 ```
 
 | Option | Type | What it does |
 | --- | --- | --- |
 | `signal` | `AbortSignal` | Cancels the call. It then throws with the code `ABORTED` |
 | `timeout` | `Duration` | Overrides the client's timeout |
-| `retry` | `RetryOptions \| false` | Overrides the client's retry policy. `false` turns retries off |
+| `retry` | `RetryOptions \| false` | Overrides the client's retry policy, field by field. `false` turns retries off |
 | `fields` | `string` | Partial response selector: only the listed fields come back. Example: `"items(id,snippet/title),nextPageToken"` |
 | `cache` | `Duration \| false` | `false` skips the cache, a duration overrides the freshness |
 | `quotaUser` | `string` | Per-user quota key, at most 40 characters |
@@ -120,15 +123,17 @@ A logger for everything:
 
 ```ts
 yt.on("request", ({ verb, method, url, attempt }) => {
-  console.debug(`-> ${verb} ${method}${attempt ? ` (attempt ${attempt + 1})` : ""} ${url}`);
+  const again = attempt ? ` (attempt ${attempt + 1})` : "";
+  console.debug(`-> ${verb} ${method}${again} ${url}`);
 });
 
 yt.on("response", ({ method, status, duration, cached, cost, bucket }) => {
-  console.info(`<- ${method} ${status} in ${duration} ms, ${cached ? "cached" : `${cost} from ${bucket}`}`);
+  const spent = cached ? "cached" : `${cost} from ${bucket}`;
+  console.info(`<- ${method} ${status} in ${duration} ms, ${spent}`);
 });
 
 yt.on("retry", ({ method, attempt, delay, error }) => {
-  console.warn(`${method}: retry ${attempt} in ${delay} ms, after ${error.message}`);
+  console.warn(`${method}: retry ${attempt} in ${delay} ms`, error.message);
 });
 
 const stop = yt.on("quota", ({ bucket, remaining }) => {
@@ -138,7 +143,7 @@ const stop = yt.on("quota", ({ bucket, remaining }) => {
 stop(); // unsubscribes the last one
 ```
 
-A listener that throws does not break the call that triggered it. The exception goes to the `error` event if someone listens to it, and is dropped otherwise.
+A listener that throws, or whose promise rejects, does not break the call that triggered it. The failure goes to the `error` event if someone listens to it, and is dropped otherwise.
 
 Failed calls have no event of their own. They throw, and you catch them where you made the call.
 
@@ -149,7 +154,10 @@ The typed resources, `yt.videos.list(...)`, are the normal way to call the API. 
 ```ts
 import type { MethodId, VideoListResponse } from "@ix-xs/youtube.api";
 
-const response = await yt.request<VideoListResponse>("videos.list", { part: "id", chart: "mostPopular" }); // 1 unit
+const response = await yt.request<VideoListResponse>("videos.list", {
+  part: "id",
+  chart: "mostPopular",
+}); // 1 unit
 
 function call(method: MethodId, params: Record<string, unknown>) {
   const { cost, bucket } = quotaCost(method);
@@ -168,7 +176,7 @@ Credentials, quota counting, cache, retries and events work as for any other cal
 
 ## Acting for another user
 
-`yt.as(credentials)` returns a client that sends its calls with another access token or `OAuth2` client. It shares the cache, the quota count, the events and the settings of the client it comes from, so a server creates one `YouTube` at startup and derives one per request. [Many users](/auth/many-users/) shows the whole pattern.
+`yt.as(credentials)` returns a client that sends its calls with another access token or `OAuth2` client. It shares the cache, the quota count, the events and the settings of the client it comes from, so a server creates one `YouTube` at startup and derives one per request. A second argument overrides `quotaUser`, `headers` or `onBehalfOfContentOwner` for that user. [Many users](/auth/many-users/) shows the whole pattern.
 
 ```ts
 // In a request handler of your server:
@@ -198,7 +206,10 @@ In a test, answer without any network:
 const yt = new YouTube({
   apiKey: "test",
   retry: false,
-  fetch: async () => new Response(JSON.stringify({ items: [] }), { headers: { "content-type": "application/json" } }),
+  fetch: async () =>
+    new Response(JSON.stringify({ items: [] }), {
+      headers: { "content-type": "application/json" },
+    }),
 });
 
 const video = await yt.videos.get("dQw4w9WgXcQ"); // null
@@ -213,36 +224,31 @@ Without the option, the global `fetch` is used. If there is none, the constructo
 `baseUrl` replaces the root of the Data API. The path of each method, `youtube/v3/videos` for instance, is appended to it.
 
 ```ts
-const yt = new YouTube({ apiKey, baseUrl: "https://youtube-proxy.example.com/" });
+const yt = new YouTube({
+  apiKey,
+  baseUrl: "https://youtube-proxy.example.com/",
+});
 ```
 
 Three things to know:
 
 - Only the Data API moves, uploads included. The Analytics and Reporting APIs keep their own hosts.
 - The proxy receives the credentials: the API key in `X-Goog-Api-Key`, or the access token in `Authorization`. Point `baseUrl` only at a host you control.
-- `headers` is the place for what your proxy needs, such as its own authentication. The client sets `authorization` and `x-goog-api-key` itself, after your headers, so those two cannot be replaced.
+- `headers` is the place for what your proxy needs, such as its own authentication. The client sets the credential header it uses, `authorization` or `x-goog-api-key`, after your headers, so you cannot replace that one.
 
 ## Content owners
 
-`onBehalfOfContentOwner` is for YouTube content partners. The client adds it to every call of a method that takes the parameter and does not set it itself, in the Data, Analytics and Reporting APIs alike. Methods that do not take it, such as `analytics.query` (which names the owner in `ids`), are left alone. A call that carries it needs OAuth.
+`onBehalfOfContentOwner` is for YouTube content partners. The client adds it to every call of a method that takes the parameter and does not set it itself, in the Data, Analytics and Reporting APIs alike. Methods that do not take it, such as `analytics.query` (which names the owner in `ids`), are left alone.
 
 ```ts
 const yt = new YouTube({ oauth, onBehalfOfContentOwner: "CONTENT_OWNER_ID" });
 ```
 
-It is a parameter that only makes sense for an authenticated user. With it, every call needs OAuth, public reads included: an API key alone is refused with `MISSING_CREDENTIALS`.
+A call that carries it needs OAuth, public reads such as `videos.list` included: with an API key alone it is refused with `MISSING_CREDENTIALS`.
 
 ## Reference
 
-### `RetryOptions`
-
-| Field | Type | Default | What it does |
-| --- | --- | --- | --- |
-| `attempts` | `number` | `3` | Retries after the first attempt. `0` turns retries off |
-| `delay` | `Duration` | `"500ms"` | First delay, doubled on each retry |
-| `maxDelay` | `Duration` | `"30s"` | Upper bound of a single delay |
-
-A per-call `retry` only replaces the fields it sets.
+The tables of `YouTubeOptions`, `RequestOptions` and `ClientEvents` are in the sections above. `RetryOptions` is on the [Errors](/basics/errors/) page, `CacheOptions` on [Caching](/basics/caching/) and `QuotaOptions` on [Quota](/basics/quota/).
 
 ### Members of the client
 
@@ -253,9 +259,13 @@ A per-call `retry` only replaces the fields it sets.
 | `yt.on(event, listener)` | Subscribes to an event. Returns a function that unsubscribes |
 | `yt.once(event, listener)` | Like `on`, for a single occurrence |
 | `yt.off(event, listener)` | Removes a listener |
-| `yt.as(credentials)` | A client that acts for another user and shares cache, quota count, events and settings |
+| `yt.as(credentials, overrides?)` | A client that acts for another user and shares cache, quota count, events and settings |
 | `yt.request(method, params?, options?)` | Calls a method by name |
 | `yt.clearCache()` | Empties the response cache |
+| `yt.liveChat(liveChatId)`, `yt.liveChatOf(video)` | A live chat, see [Live chat](/live/live-chat/) |
+| `yt.watch(channels, options?)` | A watcher for new uploads, see [Watching uploads](/notifications/watching-uploads/) |
+
+The client also has one property per resource, such as `yt.videos` and `yt.channels`. [Every method](/reference/methods/) lists them.
 
 ### Event payloads
 

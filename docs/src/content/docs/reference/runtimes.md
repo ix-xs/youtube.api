@@ -1,14 +1,16 @@
 ---
 title: Runtimes
-description: Where the library runs, what differs from one runtime to the next, and what it needs from the platform. The main entry uses standard web APIs only, and a separate entry holds what needs Node.js.
+description: Where the library runs, what the project tests, and what the main entry needs from the platform. The main entry uses standard web APIs only, and a separate entry holds what needs Node.js.
 ---
 
 ```ts
-import { YouTube } from "@ix-xs/youtube.api"; // anywhere fetch exists
-import { fileMedia } from "@ix-xs/youtube.api/node"; // Node.js: files, a local server, the default browser
+// Anywhere fetch exists.
+import { YouTube } from "@ix-xs/youtube.api";
+// Node.js: files, a local server, the default browser.
+import { fileMedia } from "@ix-xs/youtube.api/node";
 ```
 
-The package has two entry points. Everything except four helpers lives in the main one, which has no dependency and imports no Node.js module.
+The package has two entry points. Everything except four helpers lives in the main one, which has no dependency and imports no Node.js module. Importing the package has no side effect: nothing runs until you call something.
 
 ## Node.js
 
@@ -26,47 +28,39 @@ const { YouTube } = require("@ix-xs/youtube.api");
 
 | Export | What it does | Uses |
 | --- | --- | --- |
-| `fileMedia(path)` | Prepares a file on disk for upload without reading it into memory | `node:fs` |
-| `tokenFile(path)` | Keeps OAuth tokens in a JSON file | `node:fs` |
+| `fileMedia(path)` | Prepares a file on disk for upload without reading it into memory | `node:fs`, `node:path` |
+| `tokenFile(path)` | Keeps OAuth tokens in a JSON file | `node:fs/promises`, `node:path` |
 | `authorize(oauth, options)` | Runs the consent flow locally: a loopback server, and the consent page opened in the default browser | `node:http`, `node:child_process` |
 | `webSubListener(options)` | Turns `websub.receive` into a listener for `node:http` and the frameworks built on it | Node's request and response objects |
 
-When the client gets no `apiKey`, it reads the `YOUTUBE_API_KEY` environment variable from `process.env`.
+The built `/node` entry imports these modules with the `node:` prefix.
+
+When `apiKey` is left out, the client reads the `YOUTUBE_API_KEY` environment variable from `process.env`. That holds for a client created with `oauth` or `accessToken` too.
 
 What the project's CI runs:
 
 | Node.js | What is run |
 | --- | --- |
-| 22 and 24 | The unit tests, the type-level tests, the build, and a smoke test of the built files |
-| 20 | The smoke test of the built files: `require` and `import` of both entry points, a call through the client, `tokenFile` and `fileMedia` on a real file |
+| 22 and 24 | The test suite: type checks, the type-level tests, the build, the unit tests, and a smoke test of the built files |
+| 20 | The smoke test, on files built with Node.js 22: `require` and `import` of both entry points, a call through the client with a stand-in `fetch`, `tokenFile` and `fileMedia` on a real file |
 
-## Bun
+The test tooling no longer runs on Node.js 20, which is why that version gets the smoke test only.
 
-Install it and import it as in Node.js. The main entry needs nothing Bun does not provide as a web standard. The `/node` entry depends on Bun's implementation of `node:fs`, `node:http` and `node:child_process`.
+## Bun and Deno
 
-Bun is not part of the project's CI.
+Neither is part of the project's CI, so nothing is tested on them. What the source and the build say:
 
-## Deno
-
-Import the package with an `npm:` specifier:
-
-```js
-import { YouTube } from "npm:@ix-xs/youtube.api";
-
-const yt = new YouTube({ apiKey: Deno.env.get("YOUTUBE_API_KEY") });
-```
-
-The main entry uses standard web APIs only. Pass the key yourself as above: the `YOUTUBE_API_KEY` fallback only looks at `process.env`. Network access has to be allowed for `youtube.googleapis.com`, plus `oauth2.googleapis.com` for OAuth and `www.youtube.com` for feeds and oEmbed.
-
-Deno is not part of the project's CI.
+- The main entry only uses the web APIs listed in [the table below](#what-the-main-entry-needs-from-the-platform).
+- The `/node` entry imports `node:child_process`, `node:fs`, `node:fs/promises`, `node:http` and `node:path`. It works where the runtime implements them under those names.
+- The `YOUTUBE_API_KEY` fallback reads `process.env`. Where the runtime has no such object, pass `apiKey` yourself.
 
 ## Browsers
 
-The main entry runs in a page. Google's API answers cross-origin requests, so no proxy is needed for the calls themselves. What changes is what you can keep secret, which is nothing.
+The main entry is written to run in a page. Google's API allows cross-origin requests from browsers, so the API calls need no proxy. What changes is what you can keep secret, which is nothing.
 
 **The API key is visible to every visitor.** Restrict it in the Google Cloud console to your site, by HTTP referrer, and to the YouTube Data API. [Credentials](/start/credentials/) shows where.
 
-**Never ship a client secret.** Leave `clientSecret` out of an `OAuth2` created in a page. `oauth.authUrl()` uses PKCE by default, and returns the `codeVerifier` to keep until the user comes back. When your OAuth client type requires a secret for the code exchange, do that one step on your server and hand the access token to the page:
+**Never ship a client secret.** Leave `clientSecret` out of an `OAuth2` created in a page. `oauth.authUrl()` uses PKCE by default, and returns the `codeVerifier` to keep until the user comes back. When your OAuth client requires a secret for the code exchange, do that one step on your server and hand the access token to the page:
 
 ```ts
 // In the page, with a token your server obtained for this user.
@@ -79,33 +73,47 @@ const yt = new YouTube({ accessToken: () => session.accessToken });
 
 ```ts
 await yt.videos.insert({
-  body: { snippet: { title: file.name }, status: { privacyStatus: "private" } },
-  media: { body: file, onProgress: ({ percent }) => console.log(percent) },
+  body: {
+    snippet: { title: file.name },
+    status: { privacyStatus: "private" },
+  },
+  media: {
+    body: file,
+    onProgress: ({ percent }) => console.log(percent),
+  },
 });
 ```
 
 Other differences:
 
-- There is no `process.env`: pass `apiKey` explicitly.
+- The `YOUTUBE_API_KEY` fallback reads `process.env`, which a page does not have: pass `apiKey` explicitly.
 - `yt.quota` counts what this page sent since it loaded. Every visitor draws from the same project quota.
-- PKCE, WebSub signatures and the cache keys of OAuth users need `crypto.subtle`, which browsers only expose in secure contexts: HTTPS pages and `localhost`.
+- PKCE, WebSub signatures and the cache keys of calls made with a token need `crypto.subtle`, which browsers only expose in secure contexts.
+- `fetchFeed`, `oEmbed` and `websub.subscribe` do not call the API: they call `www.youtube.com` and the hub. Whether those hosts accept a request from a page is not something the project checks. Call them from a server.
 
 No browser is part of the project's CI.
 
 ## Cloudflare Workers and other edge runtimes
 
-Use the main entry. The `/node` entry is not meant for these runtimes: there is no disk for `fileMedia` and `tokenFile`, and no browser for `authorize`.
+Use the main entry. The `/node` entry is written for a machine with a disk and a browser: `fileMedia` and `tokenFile` read and write files, `authorize` listens on a local port and opens the default browser.
 
-`websub.receive` fits them as it is. It takes a `Request` and returns the `Response` to send back:
+`websub.receive` fits a request handler as it is. It takes a `Request` and returns the `Response` to send back:
 
 ```ts
 import { websub } from "@ix-xs/youtube.api";
 
+interface Env {
+  WEBSUB_SECRET: string;
+}
+
 export default {
-  async fetch(request: Request, env: { WEBSUB_SECRET: string }): Promise<Response> {
-    const { response, notifications } = await websub.receive(request, { secret: env.WEBSUB_SECRET });
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const { response, notifications } = await websub.receive(request, {
+      secret: env.WEBSUB_SECRET,
+    });
     for (const notification of notifications) {
-      if (notification.type === "video") console.log(notification.title, notification.url);
+      if (notification.type !== "video") continue;
+      console.log(notification.title, notification.url);
     }
     return response;
   },
@@ -114,26 +122,41 @@ export default {
 
 What to keep in mind where a process does not stay alive:
 
-- **Loops.** `watcher.start()` and `chat.messages()` wait on timers between two requests. How long a request or an invocation may run is the platform's limit, not the library's. For upload notifications, run one round per scheduled invocation with `watcher.check()` and pass the time of the previous run as `since`. See [Watching uploads](/notifications/watching-uploads/).
+- **Loops.** `watcher.start()` and `chat.messages()` wait on timers between two requests. How long a request or an invocation may run is the platform's limit, not the library's. For upload notifications, run one round per scheduled invocation with `watcher.check()`. Pass a `since` a few minutes before the previous run, and skip the video ids you already handled. See [Watching uploads](/notifications/watching-uploads/).
 - **Memory.** The response cache and the quota count live in memory, so they last as long as the instance does. Give the cache a `store` backed by the platform's key-value storage, and carry the quota count with `yt.quota.snapshot()` and the `quota.restore` option. See [Caching](/basics/caching/) and [Quota](/basics/quota/).
-- **Environment.** There is no `process.env` fallback unless the runtime provides one. Pass `apiKey` from the platform's bindings.
+- **Environment.** The `YOUTUBE_API_KEY` fallback only exists where the runtime provides `process.env`. Pass `apiKey` from the platform's bindings.
 
 No edge runtime is part of the project's CI.
+
+## Hosts the library calls
+
+For a runtime that restricts outgoing requests, or a content security policy:
+
+| Host | Used by |
+| --- | --- |
+| `youtube.googleapis.com` | The Data API, uploads included. The `baseUrl` option replaces it |
+| `youtubeanalytics.googleapis.com` | `yt.analytics` |
+| `youtubereporting.googleapis.com` | `yt.reporting` |
+| `oauth2.googleapis.com` | `OAuth2`: code exchange, refresh, revocation, the device flow, `tokenInfo` |
+| `www.youtube.com` | `fetchFeed`, the feed requests of a watcher, `oEmbed` |
+| `pubsubhubbub.appspot.com` | `websub.subscribe` and `websub.unsubscribe` |
+
+A resumable upload continues at the session URL the API returns, and a report download goes to the URL the API gives. Both are the API's choice. The consent page on `accounts.google.com` is opened by the user's browser, not requested by the library.
 
 ## What the main entry needs from the platform
 
 | API | Used for | Without it |
 | --- | --- | --- |
-| `fetch` | Every call | The client throws `INVALID_ARGUMENT` at creation. Pass your own with the `fetch` option |
+| `fetch` | Every call | Creating a client throws `INVALID_ARGUMENT`. Pass your own with the `fetch` option |
 | `Request`, `Response` | `websub.receive`, which reads one and builds the other | Only `websub.receive` is affected |
 | `URL`, `URLSearchParams` | Building requests, parsing YouTube URLs, OAuth and hub requests | Required |
-| `AbortController`, `AbortSignal` | Timeouts and cancellation. `oEmbed` uses `AbortSignal.timeout` | Required |
-| `TextEncoder`, `TextDecoder` | Text uploads, PKCE, WebSub signatures and notifications, the chat stream | Only those are affected |
+| `AbortController`, `AbortSignal` | Timeouts and cancellation | Required |
+| `TextEncoder`, `TextDecoder` | Text uploads, PKCE, WebSub signatures and notifications, the chat stream, the cache keys of calls made with a token | Only those are affected |
 | `Blob` | Uploads from a `Blob` or a `File`, and multipart uploads | Only uploads are affected |
 | `ReadableStream` | Uploads from a stream, the body of a request given to `websub.receive`, and the experimental `mode: "stream"` of the live chat | Only those are affected |
-| Web Crypto: `crypto.subtle`, `crypto.getRandomValues` | PKCE and the `state` of `oauth.authUrl()`, WebSub signatures, the cache keys of calls made with a token | OAuth URLs and signed notifications fail. Responses of calls made with a token are not cached |
-| `btoa` | PKCE | `oauth.authUrl()` fails |
-| `Intl.DateTimeFormat` with the `America/Los_Angeles` time zone | The quota day and `yt.quota.resetsAt`. The formatters are created when the module loads | The import fails |
+| Web Crypto: `crypto.subtle`, `crypto.getRandomValues` | PKCE and the generated `state` of `oauth.authUrl()`, WebSub signatures, the cache keys of calls made with a token | `oauth.authUrl()` fails unless you pass `state` and set `pkce: false`. Signed notifications cannot be checked. Responses of calls made with a token are not cached |
+| `btoa` | PKCE and the generated `state` | Same as above for `oauth.authUrl()` |
+| `Intl.DateTimeFormat` with the `America/Los_Angeles` time zone | The quota day and `yt.quota.resetsAt`. The formatters are built on first use, which is when a client is created | Creating a client fails |
 | `Intl.NumberFormat` with compact notation | `formatCount` | Only `formatCount` is affected |
 | `setTimeout` | Timeouts, retry delays, polling | Required |
 
@@ -160,7 +183,7 @@ Measured on the ES module build of version 2.0.0, with gzip at its default level
 | File | Raw | Gzipped |
 | --- | --- | --- |
 | `index.mjs` | 129 kB | 26 kB |
-| The chunk it shares with the `/node` entry: errors, URL helpers, feeds, WebSub | 26 kB | 8 kB |
+| The chunk it shares with the `/node` entry: errors, URL helpers, feeds, oEmbed, WebSub | 26 kB | 8 kB |
 | `node.mjs` | 6 kB | 2 kB |
 
 Importing the main entry loads the first two: about 34 kB gzipped before your bundler minifies anything. Doc comments are stripped from the JavaScript and kept in the declaration files, where editors read them. No source map is published.
@@ -172,9 +195,8 @@ The package declares `"sideEffects": false`, so a bundler is free to drop what y
 | Runtime | Main entry | `/node` entry | In the project's CI |
 | --- | --- | --- | --- |
 | Node.js 20 | Yes | Yes | Smoke test of the build |
-| Node.js 22, 24 | Yes | Yes | Full test suite |
-| Bun | Standard web APIs only | Depends on Bun's Node.js compatibility | No |
-| Deno | Standard web APIs only, through `npm:` | Depends on Deno's Node.js compatibility | No |
+| Node.js 22, 24 | Yes | Yes | Test suite |
+| Bun, Deno | Standard web APIs only | Needs the runtime's `node:` modules | No |
 | Browsers | Standard web APIs only | No | No |
 | Cloudflare Workers, edge runtimes | Standard web APIs only | No | No |
 

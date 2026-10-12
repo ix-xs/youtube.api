@@ -1,6 +1,6 @@
 ---
 title: Watching for uploads
-description: Get told when a channel publishes a video, by polling. Nothing to host, and no quota as long as YouTube's public feed answers.
+description: Get told when a channel publishes a video, by polling. Nothing to host. Reading costs no quota as long as YouTube's public feed answers.
 sidebar:
   order: 1
 ---
@@ -29,21 +29,24 @@ A video is new when both are true:
 
 `since` defaults to the moment the watcher is created, so a fresh watcher only reports uploads from now on. It never floods you with the back catalogue.
 
+A video without a usable date cannot be compared with `since`. It is reported once the channel has been read once: what the first read finds is taken as already known.
+
 ## Reacting to events
 
 ```ts
 const watcher = yt.watch("@GoogleDevelopers");
 
 const off = watcher.on("video", async (video) => {
-  try {
-    await notify(`${video.title} ${video.url}`);
-  } catch (error) {
-    console.error("Could not notify:", error);
-  }
+  await notify(`${video.title} ${video.url}`);
 });
 
-watcher.on("error", ({ channel, error }) => console.warn(`Could not check ${channel}:`, error));
-watcher.on("poll", ({ channel, source, found }) => console.log(channel, source, found));
+watcher.on("error", ({ channel, error }) => {
+  if (channel) console.warn(`Could not check ${channel}:`, error);
+  else console.warn("A listener failed:", error);
+});
+watcher.on("poll", ({ channel, source, found }) => {
+  console.log(channel, source, found);
+});
 
 watcher.start();
 
@@ -55,21 +58,25 @@ watcher.stop(); // stops polling
 | Event | Payload | When |
 | --- | --- | --- |
 | `video` | A `WatchedVideo` | A new video was found. Within a round, oldest first |
-| `error` | `{ channel, error }` | Checking one channel failed. The watcher keeps going |
+| `error` | `{ channel, error }` | Checking one channel failed, or one of your listeners failed. The watcher keeps going |
 | `poll` | `{ channel, channelId, source, found }` | A channel was checked, with the number of new videos |
 
 `on` returns a function that removes the listener. `once` and `off` exist too.
 
-Catch errors inside an async listener, as above. The watcher does not await listeners, so a rejected promise is an unhandled rejection in your process.
+In an `error` payload, `channel` is the channel as you gave it. It is an empty string when the failure is not about a channel: one of your own listeners threw, or returned a promise that rejected. A failing listener never stops the watcher.
 
-Listen to `error`. Without a listener, a channel that cannot be checked fails silently: a mistyped handle, a feed outage in `feed` mode, a quota problem.
+Listen to `error`. Without a listener, every failure is silent: a mistyped handle, a feed outage in `feed` mode, a quota problem, a listener of yours that threw.
+
+A reference that matches no channel is reported once through `error`, as a `YouTubeArgumentError`. The watcher then leaves it alone for 6 hours before it looks it up again, so a typo does not spend quota at every round.
 
 ## As a stream
 
 A watcher is also an async iterable. The loop starts the watcher and stops it when you leave.
 
 ```ts
-for await (const video of yt.watch(["@GoogleDevelopers"], { interval: "10m" })) {
+const uploads = yt.watch(["@GoogleDevelopers"], { interval: "10m" });
+
+for await (const video of uploads) {
   console.log(video.title, video.url);
   if (video.title.includes("Keynote")) break; // also stops the watcher
 }
@@ -89,19 +96,24 @@ watcher.running; // true
 
 `remove` takes the channel the way you gave it to `add`. A channel added by handle is not removed by its id.
 
-A channel added later with `add()` starts from the moment it is added: what it published before is not reported, whatever `since` says.
+Channel ids are compared exactly, upper and lower case included. Handles and URLs are compared without regard to case: `remove("@googledevelopers")` removes `"@GoogleDevelopers"`. Adding a channel that is already there does nothing.
+
+A channel added with `add()` after the watcher was created starts from the moment it is added: what it published before is not reported, whatever `since` says.
 
 ## From a cron job
 
 When there is no long-lived process, run one round per invocation with `check()`. It resolves to the new videos, oldest first. They are also emitted as `video` events.
 
-Give `since` the time of your previous run, so nothing published between two runs is missed:
+Give `since` a time a few minutes before your previous run. The feed lags behind uploads, so a video published just before a run may only appear in the feed after it. The margin makes two runs overlap, so remember the videos you handled and skip them:
 
 ```ts
-const startedAt = new Date();
-const lastRun: string | undefined = await db.get("lastRun");
+const MARGIN = 10 * 60_000;
+const startedAt = Date.now();
+const lastRun: number | undefined = await db.get("lastRun");
 
-const watcher = yt.watch(["@GoogleDevelopers", "@YouTube"], { since: lastRun ?? startedAt });
+const watcher = yt.watch(["@GoogleDevelopers", "@YouTube"], {
+  since: lastRun === undefined ? startedAt : lastRun - MARGIN,
+});
 
 let failed = false;
 watcher.on("error", ({ channel, error }) => {
@@ -110,11 +122,13 @@ watcher.on("error", ({ channel, error }) => {
 });
 
 for (const video of await watcher.check()) {
+  if (await db.has(`seen:${video.videoId}`)) continue;
   await notify(`${video.channelTitle}: ${video.title} ${video.url}`);
+  await db.set(`seen:${video.videoId}`, true);
 }
 
 // Only move the mark forward when every channel was read.
-if (!failed) await db.set("lastRun", startedAt.toISOString());
+if (!failed) await db.set("lastRun", startedAt);
 ```
 
 Two details make this safe:
@@ -136,7 +150,7 @@ The `source` option decides.
 | `"feed"` | The public feed only | Nothing |
 | `"api"` | The uploads playlist, through the Data API | 1 unit per channel per round |
 
-On top of that, a handle or a URL costs 1 unit to resolve to an id, once. Channel ids cost nothing.
+On top of that, a handle costs 1 unit to resolve to an id, once. Channel ids and `/channel/` URLs cost nothing: see [Channels](/resources/channels/).
 
 ### The feed, honestly
 
@@ -145,11 +159,11 @@ The public feed is an Atom document YouTube serves for every channel. It needs n
 - It lags a few minutes behind uploads.
 - It has outages where every feed answers 404, for hours.
 
-That is why `auto` is the default. When the feed of a channel fails, the watcher reads that channel through the API in the same round, and keeps doing so for 30 minutes before it tries the feed again. During an outage a round costs 1 unit per channel.
+That is why `auto` is the default. When the feed of a channel fails, the watcher reads that channel through the API in the same round, and keeps doing so for 30 minutes before it tries the feed again. The 30 minutes are counted per channel: the other channels stay on the feed until their own feed fails. During an outage a round costs 1 unit per channel.
 
 What an outage costs depends on the pace. With 10 channels every 5 minutes, there are 12 rounds an hour: 120 units per hour of outage, and 2,880 units if it lasted the whole day. `source: "api"` costs that every day.
 
-With `source: "feed"`, a failure is an `error` event and the round reports nothing for that channel. The error is a `YouTubeRequestError` with the code `FEED_UNAVAILABLE`. Videos published during the outage are reported once the feed is back, as long as they are still among the 15 most recent.
+With `source: "feed"`, a failure is an `error` event and the round reports nothing for that channel. The error is a `YouTubeRequestError` with the code `FEED_UNAVAILABLE`, or `TIMEOUT` when the feed did not answer in 15 seconds. Videos published during the outage are reported once the feed is back, as long as they are still among the 15 most recent.
 
 [Feeds and oEmbed](/notifications/feeds-and-oembed/) describes the feed itself.
 
@@ -179,8 +193,10 @@ For more than this, fetch the video. One `videos.list` call costs 1 unit:
 const watcher = yt.watch("@GoogleDevelopers");
 
 watcher.on("video", async ({ videoId }) => {
-  const video = await yt.videos.get(videoId).catch(() => null);
-  if (video) console.log(formatDuration(video.contentDetails.duration), video.statistics.viewCount);
+  const video = await yt.videos.get(videoId);
+  if (!video) return;
+  console.log(formatDuration(video.contentDetails.duration));
+  console.log(video.statistics.viewCount);
 });
 ```
 
@@ -204,7 +220,7 @@ There is no API to fall back on here, so `auto` means the feed only, and an outa
 
 Polling needs nothing but a running process, and tells you about an upload after the feed's lag plus up to one `interval`.
 
-[Push notifications](/notifications/push-notifications/) reach you within seconds, with no polling and no quota at all. They need a public HTTPS endpoint, and subscriptions that you renew.
+[Push notifications](/notifications/push-notifications/) reach you within seconds, with no polling and no quota. They need a public HTTPS endpoint, and subscriptions that you renew.
 
 Use the watcher for a bot, a script or a cron job. Use push when you already run a web server and delay matters.
 
@@ -216,7 +232,7 @@ Use the watcher for a bot, a script or a cron job. Use push when you already run
 | --- | --- | --- |
 | `interval` | `"5m"` | Time between two rounds: milliseconds, or a string such as `"30s"`, `"5m"`, `"2h"` |
 | `source` | `"auto"` | `"auto"`, `"feed"` or `"api"` |
-| `since` | Creation time | Report videos published after this moment |
+| `since` | Creation time | Report videos published after this moment. For the channels given at creation |
 | `fetch` | The client's | Custom `fetch` for the feed requests |
 
 ### `Watcher`
@@ -225,6 +241,7 @@ Use the watcher for a bot, a script or a cron job. Use push when you already run
 | --- | --- |
 | `on(event, listener)` | Subscribes. Returns a function that unsubscribes |
 | `once(event, listener)`, `off(event, listener)` | One occurrence only, and removal |
+| `hasListeners(event)` | Whether anyone listens to the event |
 | `start()` | One round now, then one per interval. Returns the watcher |
 | `stop()` | Stops polling |
 | `check()` | Runs one round and resolves to the new videos, oldest first |
@@ -233,7 +250,7 @@ Use the watcher for a bot, a script or a cron job. Use push when you already run
 | `running` | Whether the watcher is polling |
 | `for await (const video of watcher)` | Starts, yields new videos, stops when the loop is left |
 
-Calling `check()` while a round is running returns that round instead of starting a second one.
+Calling `check()` while a round is running returns that round instead of starting a second one. `check()` never rejects because a channel failed.
 
 ### `WatchedVideo`
 

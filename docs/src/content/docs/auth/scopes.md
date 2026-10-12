@@ -22,7 +22,7 @@ Everywhere a scope is expected you can write the short name, the full URL, or th
 | Short name | `Scopes` key | What it allows |
 | --- | --- | --- |
 | `youtube.readonly` | `readonly` | View the YouTube account |
-| `youtube` | `manage` | Manage the account: reads and writes, except comments and captions |
+| `youtube` | `manage` | Manage the account: videos, playlists, subscriptions, live broadcasts. Not comments or captions |
 | `youtube.force-ssl` | `forceSsl` | Everything `youtube` does, plus comments and captions |
 | `youtube.upload` | `upload` | Upload videos, thumbnails, banners and watermarks |
 | `youtube.channel-memberships.creator` | `channelMemberships` | See a channel's current members, their level and join date |
@@ -44,27 +44,34 @@ Short names are typed, so the editor completes them. The full URL is `https://ww
 | List, download, upload or delete captions | `youtube.force-ssl` | |
 | Schedule broadcasts, send or moderate live chat | `youtube` | `youtube.readonly` is enough to list broadcasts and read a chat |
 | List channel members and membership levels | `youtube.channel-memberships.creator` | The only scope those two methods accept |
-| Query Analytics, run Reporting jobs | `yt-analytics.readonly` | |
+| Query Analytics, run Reporting jobs | `yt-analytics.readonly` | Analytics queries also accept `youtube.readonly`. Reporting does not |
 | Query revenue metrics | `yt-analytics-monetary.readonly` | |
 
 Two rules of thumb:
 
 - `youtube.force-ssl` is accepted by nearly every Data API method. The exceptions are the two membership methods and the partner-only `thirdPartyLinks` methods. It is the one to ask for when an app does a bit of everything, comments included.
-- A narrower scope makes a shorter consent screen. An app that only reads should ask for `youtube.readonly`.
+- Ask for the narrowest scope that covers your calls. An app that only reads should ask for `youtube.readonly`.
 
-Reading comments in public is a special case. `commentThreads.list` works with an API key. With a token it only accepts `youtube.force-ssl`, so a client that holds a `youtube.readonly` token cannot use that token to read comments.
+Reading comments is a special case. `commentThreads.list` and `comments.list` work with an API key. With a token they only accept `youtube.force-ssl`. A client that holds a `youtube.readonly` token cannot read comments with it: the call goes out with the API key when the client has one, and is refused otherwise.
 
 ## How the client checks scopes
 
-Before sending a call, the client compares the scopes of the token with the scopes the method accepts. If none matches, the call throws a `YouTubeAuthError` with the code `INSUFFICIENT_SCOPE`. Nothing was sent, so no quota was spent. One exception: a public read on a client that also has an API key goes out with the key instead of failing.
+Before sending a call, the client compares the scopes of the token with the scopes the method accepts. If none matches, the call throws a `YouTubeAuthError` with the code `INSUFFICIENT_SCOPE`. Nothing was sent, so no quota was spent.
+
+One exception: a public read, a call an API key is enough for, does not fail on a client that also has an API key. It goes out with the key instead of the token.
 
 ```ts
 try {
   await yt.commentThreads.post(videoId, "Nice one");
 } catch (error) {
-  if (error instanceof YouTubeAuthError && error.code === "INSUFFICIENT_SCOPE") {
-    console.log(error.scopes); // ["youtube.force-ssl"]: any of these would have worked
-    console.log(error.message); // names the method, the accepted scopes and the ones the token has
+  if (
+    error instanceof YouTubeAuthError &&
+    error.code === "INSUFFICIENT_SCOPE"
+  ) {
+    // Any of these would have worked: ["youtube.force-ssl"]
+    console.log(error.scopes);
+    // Names the method, the accepted scopes and the ones the token has.
+    console.log(error.message);
   } else {
     throw error;
   }
@@ -78,7 +85,7 @@ The check needs to know what the token holds. It runs when both of these are tru
 
 It is skipped in these cases, because the scopes are unknown:
 
-- The tokens have no `scope`, for example when you only stored the refresh token.
+- The tokens have no `scope`. Tokens built from a refresh token alone start that way. A refresh fills `scope` in when Google's answer carries it.
 - The client was created with a plain `accessToken`.
 - The call carries its own `accessToken` request option.
 
@@ -97,7 +104,8 @@ Three places, from the closest to your code to the furthest:
 ```ts
 import { METHODS } from "@ix-xs/youtube.api";
 
-METHODS["videos.rate"].scopes; // ["youtube", "youtube.force-ssl", "youtubepartner"]
+METHODS["videos.rate"].scopes;
+// ["youtube", "youtube.force-ssl", "youtubepartner"]
 METHODS["videos.rate"].auth; // "oauth": an API key can never be enough
 METHODS["videos.list"].auth; // "any": a key works for public data
 ```
@@ -110,7 +118,8 @@ import { METHODS, type MethodId } from "@ix-xs/youtube.api";
 function canCall(method: MethodId): boolean {
   const granted = oauth.grantedScopes;
   const accepted = METHODS[method].scopes;
-  if (!granted || accepted.length === 0) return true; // unknown: let the API decide
+  // Unknown: let the API decide.
+  if (!granted || accepted.length === 0) return true;
   return accepted.some((scope) => granted.has(scope));
 }
 
@@ -129,7 +138,7 @@ const first = await oauth.authUrl({ scopes: ["youtube.readonly"] });
 const second = await oauth.authUrl({ scopes: ["youtube.upload"] });
 ```
 
-`includeGrantedScopes` is `true` by default: it asks Google to keep the scopes the user granted earlier in addition to the new ones. After the second exchange, one set of tokens covers both. Pass `includeGrantedScopes: false` to get tokens limited to the scopes of that request.
+`includeGrantedScopes` is `true` by default: it asks Google to keep the scopes the user granted earlier in addition to the new ones. After the second exchange, one set of tokens covers both. Pass `includeGrantedScopes: false` to leave the earlier grants out of the request.
 
 The `INSUFFICIENT_SCOPE` error is a good trigger for it. In a route, with `app`, `req`, `res` and `session` standing for your application:
 
@@ -141,7 +150,9 @@ app.post("/videos/:id/like", async (req, res) => {
   } catch (error) {
     if (!isYouTubeError(error, "INSUFFICIENT_SCOPE")) throw error;
 
-    const { url, state, codeVerifier } = await oauth.authUrl({ scopes: ["youtube"] });
+    const { url, state, codeVerifier } = await oauth.authUrl({
+      scopes: ["youtube"],
+    });
     session.oauthState = state;
     session.codeVerifier = codeVerifier;
     res.redirect(url);
@@ -164,14 +175,15 @@ await oauth.authUrl({ scopes: ["youtube.readonly", "openid", "email"] });
 `scopeUrl` expands a short name to the URL Google expects. `scopeName` does the reverse. You need them when you talk to Google's endpoints yourself, or when you compare scopes that come from another library.
 
 ```ts
-scopeUrl("youtube.readonly"); // "https://www.googleapis.com/auth/youtube.readonly"
+scopeUrl("youtube.readonly");
+// "https://www.googleapis.com/auth/youtube.readonly"
 scopeUrl("openid"); // "openid": OpenID Connect scopes are left as they are
 scopeUrl(Scopes.upload); // a full URL is returned unchanged
 
 scopeName("https://www.googleapis.com/auth/youtube.upload"); // "youtube.upload"
 ```
 
-The library always reports short names: in `oauth.grantedScopes`, in `tokenInfo().scopes`, in `METHODS[id].scopes` and in `error.scopes`.
+The library reports short names in `oauth.grantedScopes`, in `tokenInfo().scopes`, in `METHODS[id].scopes` and in `error.scopes`. Only `oauth.tokens.scope` keeps the string Google sent.
 
 ## Reference
 
@@ -190,7 +202,7 @@ The library always reports short names: in `oauth.grantedScopes`, in `tokenInfo(
 | `oauth.grantedScopes` | `ReadonlySet<string> \| undefined` |
 | `(await oauth.tokenInfo()).scopes` | `string[]` |
 | `oauth.tokens.scope` | `string \| undefined`, space separated, as Google returns them |
-| `YouTubeAuthError.scopes` | `readonly string[]`: the scopes that would have allowed the call |
+| `YouTubeAuthError.scopes` | `readonly string[]`: the scopes that would have allowed the call. Empty when unknown |
 
 ## See also
 

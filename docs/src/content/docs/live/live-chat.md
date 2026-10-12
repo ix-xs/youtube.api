@@ -9,7 +9,8 @@ sidebar:
 const chat = await yt.liveChatOf("https://www.youtube.com/watch?v=jfKfPfyJRdk");
 
 for await (const message of chat.messages()) {
-  console.log(`${message.authorDetails.displayName}: ${message.snippet.displayMessage}`);
+  const { displayName } = message.authorDetails;
+  console.log(`${displayName}: ${message.snippet.displayMessage}`);
 }
 ```
 
@@ -33,7 +34,7 @@ const chat = yt.liveChat(liveChatId);
 
 ## Reading messages
 
-`chat.messages()` is an async generator. It asks YouTube for new messages, yields them, waits for the time YouTube asks for, and starts again.
+`chat.messages()` is an async generator. It asks YouTube for new messages, yields them, waits for the time YouTube asks for, and starts again. Quota: 5 units per request.
 
 ```ts
 const chat = yt.liveChat(liveChatId);
@@ -41,8 +42,11 @@ const chat = yt.liveChat(liveChatId);
 const stop = new AbortController();
 process.once("SIGINT", () => stop.abort());
 
-for await (const message of chat.messages({ signal: stop.signal, minInterval: "10s" })) {
-  console.log(message.snippet.publishedAt, message.authorDetails.displayName, message.snippet.displayMessage);
+const messages = chat.messages({ signal: stop.signal, minInterval: "10s" });
+
+for await (const { snippet, authorDetails } of messages) {
+  console.log(snippet.publishedAt, authorDetails.displayName);
+  console.log(snippet.displayMessage);
 }
 
 console.log("Chat closed.");
@@ -53,9 +57,9 @@ Each message is a `ChatMessage`: a chat message with its `snippet` and its `auth
 | Option | Default | Effect |
 | --- | --- | --- |
 | `history` | `false` | `true` also yields the messages already in the chat when reading starts |
-| `minInterval` | none | Never ask more often than this, even when YouTube allows it |
+| `minInterval` | none | Never ask more often than this, even when YouTube allows it. In `"stream"` mode, the pause before reconnecting |
 | `signal` | none | Aborting it ends the loop quietly |
-| `profileImageSize` | API default | Size in pixels of `authorDetails.profileImageUrl`, 16-720 |
+| `profileImageSize` | API default | Size in pixels of `authorDetails.profileImageUrl`, from 16 to 720 |
 | `hl` | API default | Language of the system messages, for example `"fr"` |
 | `mode` | `"poll"` | `"stream"` keeps one connection open. [Experimental](#one-connection-instead-of-polling) |
 
@@ -72,7 +76,10 @@ const subscription = chat.listen(
   (message) => {
     if (message.snippet.displayMessage === "!hello") void chat.send("Hello!");
   },
-  { minInterval: "5s", onError: (error) => console.error("Chat reading failed:", error) },
+  {
+    minInterval: "5s",
+    onError: (error) => console.error("Chat reading failed:", error),
+  },
 );
 
 // Later.
@@ -80,7 +87,7 @@ subscription.stop();
 await subscription.done;
 ```
 
-`done` settles when listening is over: the chat ended, `stop()` was called, or reading failed. Without `onError`, a failure rejects `done`.
+`done` settles when listening is over: the chat ended, `stop()` was called, or reading failed. A failure goes to `onError` when you gave one. Without it, the failure rejects `done`.
 
 The callback can be async. Messages are delivered one at a time: the next one waits for your callback to finish. A callback that throws ends the loop and counts as a failure.
 
@@ -93,29 +100,39 @@ A chat carries more than text. Switch on `message.snippet.type`, then read the d
 ```ts
 const chat = yt.liveChat(liveChatId);
 
-for await (const message of chat.messages()) {
-  const { snippet, authorDetails } = message;
+for await (const { snippet, authorDetails } of chat.messages()) {
   const author = authorDetails.displayName;
 
   switch (snippet.type) {
     case "textMessageEvent":
       console.log(`${author}: ${snippet.textMessageDetails?.messageText}`);
       break;
-    case "superChatEvent":
-      console.log(`${author} sent ${snippet.superChatDetails?.amountDisplayString}: ${snippet.superChatDetails?.userComment ?? ""}`);
+    case "superChatEvent": {
+      const paid = snippet.superChatDetails;
+      const comment = paid?.userComment ?? "";
+      console.log(`${author} sent ${paid?.amountDisplayString}: ${comment}`);
       break;
-    case "superStickerEvent":
-      console.log(`${author} sent a sticker worth ${snippet.superStickerDetails?.amountDisplayString}`);
+    }
+    case "superStickerEvent": {
+      const amount = snippet.superStickerDetails?.amountDisplayString;
+      console.log(`${author} sent a sticker worth ${amount}`);
       break;
-    case "newSponsorEvent":
-      console.log(`${author} joined as a member (${snippet.newSponsorDetails?.memberLevelName ?? "no level"})`);
+    }
+    case "newSponsorEvent": {
+      const level = snippet.newSponsorDetails?.memberLevelName ?? "no level";
+      console.log(`${author} joined as a member (${level})`);
       break;
-    case "memberMilestoneChatEvent":
-      console.log(`${author}: member for ${snippet.memberMilestoneChatDetails?.memberMonth} months`);
+    }
+    case "memberMilestoneChatEvent": {
+      const months = snippet.memberMilestoneChatDetails?.memberMonth;
+      console.log(`${author}: member for ${months} months`);
       break;
-    case "membershipGiftingEvent":
-      console.log(`${author} gifted ${snippet.membershipGiftingDetails?.giftMembershipsCount} memberships`);
+    }
+    case "membershipGiftingEvent": {
+      const count = snippet.membershipGiftingDetails?.giftMembershipsCount;
+      console.log(`${author} gifted ${count} memberships`);
       break;
+    }
     default:
       if (snippet.displayMessage) console.log(snippet.displayMessage);
   }
@@ -124,15 +141,18 @@ for await (const message of chat.messages()) {
 
 YouTube calls members "sponsors" in this API: `newSponsorEvent` is a new member, `isChatSponsor` is "is a member".
 
-Every details object is optional in the types, because it is only set for its own message type. `displayMessage` is the text YouTube would show for the message, whatever the type. It is absent on `tombstone` and `chatEndedEvent`, which are silent.
+Every details object is optional in the types, because it is only set for its own message type. `displayMessage` is the text to show for the message, whatever the type. It is absent on `tombstone` and `chatEndedEvent`, which are silent.
 
 Amounts come as a display string and as micros. Divide by one million to get the amount:
 
 ```ts
-function superChatAmount(message: ChatMessage): { amount: number; currency: string } | undefined {
+function superChatAmount(message: ChatMessage) {
   const details = message.snippet.superChatDetails;
   if (!details?.amountMicros || !details.currency) return undefined;
-  return { amount: Number(details.amountMicros) / 1_000_000, currency: details.currency };
+  return {
+    amount: Number(details.amountMicros) / 1_000_000,
+    currency: details.currency,
+  };
 }
 ```
 
@@ -141,20 +161,20 @@ The author's role is on `authorDetails`:
 ```ts
 const chat = yt.liveChat(liveChatId);
 
-for await (const message of chat.messages()) {
-  const { isChatOwner, isChatModerator, isChatSponsor, isVerified } = message.authorDetails;
+for await (const { snippet, authorDetails: author } of chat.messages()) {
+  const text = snippet.displayMessage;
 
-  if (isChatOwner || isChatModerator) console.log("staff:", message.snippet.displayMessage);
-  else if (isChatSponsor) console.log("member:", message.snippet.displayMessage);
-  else if (isVerified) console.log("verified:", message.snippet.displayMessage);
+  if (author.isChatOwner || author.isChatModerator) console.log("staff:", text);
+  else if (author.isChatSponsor) console.log("member:", text);
+  else if (author.isVerified) console.log("verified:", text);
 }
 ```
 
 ## What reading costs
 
-Each request costs 5 units, and there is one request every few seconds for as long as the loop runs. The pace is the one YouTube returns with each answer.
+Each request costs 5 units, and the loop makes one after each wait for as long as it runs. The wait is the one YouTube returns with each answer, or 5 seconds when the answer gives none.
 
-Taking one request every 5 seconds:
+With a wait of 5 seconds:
 
 | Pace | Requests per hour | Units per hour | The 10,000 daily units last |
 | --- | --- | --- | --- |
@@ -171,7 +191,7 @@ Two chats read at once cost twice as much. [Quota](/basics/quota/) shows how to 
 
 The loop ends without an error when:
 
-- the broadcast went offline, or the API answers that the chat ended (`liveChatEnded`) or is disabled (`liveChatDisabled`);
+- the answer says the broadcast went offline, or the API answers that the chat ended (`liveChatEnded`) or is disabled (`liveChatDisabled`);
 - `signal` was aborted, or `stop()` was called.
 
 Anything else throws out of the `for await`, after the client's own retries: quota exhausted, credentials refused, network down.
@@ -185,8 +205,8 @@ try {
   }
   console.log("The chat is over.");
 } catch (error) {
-  if (isYouTubeError(error, "QUOTA_EXCEEDED")) console.log("Out of quota until", yt.quota.resetsAt);
-  else throw error;
+  if (!isYouTubeError(error, "QUOTA_EXCEEDED")) throw error;
+  console.log("Out of quota until", yt.quota.resetsAt);
 }
 ```
 
@@ -215,11 +235,13 @@ await chat.delete(messageId); // 20 units
 const chat = yt.liveChat(liveChatId);
 
 for await (const message of chat.messages()) {
-  if (message.snippet.displayMessage?.includes("spam.example")) {
-    await chat.delete(message.id);
-    const ban = await chat.ban(message.authorDetails.channelId, { duration: "5m" });
-    console.log("Banned for 5 minutes, ban id", ban.id);
-  }
+  if (!message.snippet.displayMessage?.includes("spam.example")) continue;
+
+  await chat.delete(message.id); // 20 units
+  const ban = await chat.ban(message.authorDetails.channelId, {
+    duration: "5m",
+  });
+  console.log("Banned for 5 minutes, ban id", ban.id);
 }
 ```
 
@@ -249,7 +271,7 @@ const added = await chat.addModerator(channelId); // 200 units
 await chat.removeModerator(added.id); // 200 units
 ```
 
-`addModerator` takes a channel id. `removeModerator` takes the id of the moderator resource, the one `addModerator` and `moderators()` return, not the channel id.
+`moderators()` reads every page and resolves to one array. `addModerator` takes a channel id. `removeModerator` takes the id of the moderator resource, the one `addModerator` and `moderators()` return, not the channel id.
 
 ## Super Chat history
 
@@ -257,8 +279,11 @@ await chat.removeModerator(added.id); // 200 units
 
 ```ts
 for await (const event of yt.superChatEvents.list({ part: "snippet" })) {
-  const { supporterDetails, displayString, commentText, createdAt, isSuperStickerEvent } = event.snippet;
-  console.log(createdAt, supporterDetails?.displayName, displayString, isSuperStickerEvent ? "(sticker)" : commentText);
+  const { supporterDetails, displayString, createdAt } = event.snippet;
+  const what = event.snippet.isSuperStickerEvent
+    ? "(sticker)"
+    : event.snippet.commentText;
+  console.log(createdAt, supporterDetails?.displayName, displayString, what);
 }
 ```
 
@@ -277,16 +302,23 @@ for await (const message of chat.messages({ mode: "stream" })) {
 ```
 
 :::caution
-This is experimental. YouTube documents this method for gRPC. The library goes through the HTTP mapping of the same method, which Google does not document. Prefer the default polling when you need something dependable.
+This is experimental. YouTube documents this method for gRPC only. The library goes through the HTTP mapping of the same method, which Google does not document. Prefer the default polling when you need something dependable.
 :::
 
-Quota: 5 units per connection. When the server closes the connection, the loop waits a moment and reconnects from the last position.
+Quota: 5 units per connection. When the server closes the connection, the loop pauses, then reconnects from the last position. The pause is `minInterval`, and 1 second at least.
+
+A connection is one request, and the client's `timeout` does not apply to it. A connection that drops is reopened from the last position, with a longer pause each time. After three drops in a row without a message, the loop throws a `YouTubeRequestError` with code `NETWORK`. Pass a `signal` to stop.
 
 The method behind it is `yt.liveChatMessages.stream()`. Each value is a batch shaped like a `list` response. Pass its `nextPageToken` as `pageToken` to resume after a disconnect.
 
 ```ts
-for await (const batch of yt.liveChatMessages.stream({ liveChatId, part: ["snippet", "authorDetails"] })) {
-  console.log(batch.items.length, "messages, resume token", batch.nextPageToken);
+const batches = yt.liveChatMessages.stream({
+  liveChatId,
+  part: ["snippet", "authorDetails"],
+});
+
+for await (const batch of batches) {
+  console.log(batch.items.length, "messages, resume at", batch.nextPageToken);
 }
 ```
 
@@ -309,19 +341,23 @@ for await (const batch of yt.liveChatMessages.stream({ liveChatId, part: ["snipp
 | `chat.addModerator(channelId)` | 200 | OAuth | Makes a user a moderator |
 | `chat.removeModerator(moderatorId)` | 200 | OAuth | Removes a moderator |
 
+In `"stream"` mode, `messages` and `listen` cost 5 units per connection.
+
+`liveChatOf` and the methods from `send` down also take the [options of one call](/basics/configuration/) as their last argument. `ban` takes them next to `duration`.
+
 The raw methods are there too: `yt.liveChatMessages` (`list`, `insert`, `delete`, `stream`, and `transition`, which closes a running poll for 20 units), `yt.liveChatBans`, `yt.liveChatModerators` and `yt.superChatEvents`.
 
 ### Values of `snippet.type`
 
 | Type | Details in | What happened |
 | --- | --- | --- |
-| `textMessageEvent` | `textMessageDetails` | A viewer wrote a message |
+| `textMessageEvent` | `textMessageDetails` | A viewer wrote a message: `messageText` |
 | `superChatEvent` | `superChatDetails` | A Super Chat: `amountDisplayString`, `amountMicros`, `currency`, `tier`, `userComment` |
-| `superStickerEvent` | `superStickerDetails` | A Super Sticker, with `superStickerMetadata` |
+| `superStickerEvent` | `superStickerDetails` | A Super Sticker: the same amount fields and `tier`, with `superStickerMetadata` |
 | `newSponsorEvent` | `newSponsorDetails` | A viewer became a member: `memberLevelName`, `isUpgrade` |
 | `memberMilestoneChatEvent` | `memberMilestoneChatDetails` | A member's milestone message: `memberMonth`, `memberLevelName`, `userComment` |
 | `membershipGiftingEvent` | `membershipGiftingDetails` | A viewer bought gift memberships: `giftMembershipsCount`, `giftMembershipsLevelName` |
-| `giftMembershipReceivedEvent` | `giftMembershipReceivedDetails` | A viewer received a gift membership |
+| `giftMembershipReceivedEvent` | `giftMembershipReceivedDetails` | A viewer received a gift membership: `memberLevelName`, `gifterChannelId`, `associatedMembershipGiftingMessageId` |
 | `giftEvent` | `giftDetails` | A virtual gift sent to support the creator |
 | `pollEvent` | `pollDetails` | A poll: `status`, and `metadata` with the question and the options |
 | `userBannedEvent` | `userBannedDetails` | A moderator banned a user: `bannedUserDetails`, `banType`, `banDurationSeconds` |
@@ -331,10 +367,10 @@ The raw methods are there too: `yt.liveChatMessages` (`list`, `insert`, `delete`
 | `sponsorOnlyModeEndedEvent` | | Members-only mode was turned off |
 | `chatEndedEvent` | | The chat ended. Silent: no `displayMessage` |
 | `tombstone` | | Silent: no `displayMessage` |
-| `fanFundingEvent` | `fanFundingEventDetails` | Deprecated |
+| `fanFundingEvent` | `fanFundingEventDetails` | The details are deprecated |
 | `invalidType` | | Not a valid message type |
 
-Fields of `snippet` that are always there: `type`, `liveChatId`, `publishedAt`, `hasDisplayContent`.
+Fields of `snippet` that are always there: `type`, `liveChatId`, `publishedAt`, `hasDisplayContent`. `authorChannelId` is not always filled: read the author from `authorDetails`.
 
 ### `authorDetails`
 
@@ -345,10 +381,12 @@ Fields of `snippet` that are always there: `type`, `liveChatId`, `publishedAt`, 
 | Situation | What you get |
 | --- | --- |
 | A write with an API key only | `YouTubeAuthError`, code `MISSING_CREDENTIALS`, thrown before anything is sent. No quota spent |
-| A token without `youtube` or `youtube.force-ssl` | `YouTubeAuthError`, code `INSUFFICIENT_SCOPE` |
+| A write with a token known to have neither `youtube` nor `youtube.force-ssl` | `YouTubeAuthError`, code `INSUFFICIENT_SCOPE`, thrown before anything is sent |
 | `liveChatOf` on a video that is not live | `YouTubeArgumentError` |
 | The chat ended or is disabled while reading | The loop ends, no error |
 | Quota used up | `YouTubeApiError`, code `QUOTA_EXCEEDED` |
+
+Listing moderators and the Super Chat history also accept the `youtube.readonly` scope.
 
 On the other calls, the chat-specific values of `error.reason` are `liveChatNotFound`, `liveChatEnded` and `liveChatDisabled`.
 

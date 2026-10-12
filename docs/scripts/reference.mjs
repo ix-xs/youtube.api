@@ -4,12 +4,14 @@
 //   src/content/docs/reference/methods.md       every API method
 //   src/content/docs/reference/quota-costs.md   what each method costs
 //   src/content/docs/reference/exports.md       every export of the package
+//   src/content/docs/fr/reference/*.md          the same three pages in French
 //   src/data/parts.json                         the landing page's playground
 //   src/data/parts.worst.json                   the same with the worst real data, to test the playground
 //
 //   node scripts/reference.mjs           write the files
 //   node scripts/reference.mjs --check   fail if a file is out of date
 
+import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -118,40 +120,185 @@ for (const api of APIS) {
   }
 }
 
-const cost = (method) => (method.quota === undefined ? "" : method.bucket ? `1 call, \`${method.bucket}\` bucket` : String(method.quota));
+// ------------------------------------------------------------------ words
+
+/** The languages the pages are written in: English, then the translations. */
+const LANGUAGES = ["en", "fr"];
+const content = path.join(here, "..", "src", "content", "docs");
+
+/**
+ * The words of the pages themselves. What describes a method or an export
+ * comes from the source, in English, as an editor shows it.
+ */
+const WORDS = {
+  en: {
+    methods: {
+      title: "Every method",
+      description: (count) => `The ${count} methods of the YouTube Data, Analytics and Reporting APIs, with what each one does, what it costs and the credentials it needs.`,
+      intro: "Each method name links to Google's reference for it. The same information is in your editor: hover a method to see its description, its quota cost and an example.",
+      quota: "- **Quota** is the cost of one call in units. Three methods draw from a bucket of their own instead: see [Quota](/basics/quota/).",
+      auth: "- **Auth** is `key` when an API key is enough for public data, `OAuth` when the method always needs a user. A `key` method still needs OAuth for private data or with parameters such as `mine`.",
+      count: (count, live) => `${count} methods${live ? ", live streaming included" : ""}.`,
+      live: "Live streaming",
+      liveNote: "These methods are part of the Data API and share its quota.",
+      guide: (title, link) => `Guide: [${title}](${link}).`,
+      columns: "| Method | What it does | Quota | Auth |",
+      shortColumns: "| Method | What it does |",
+      deprecated: "Deprecated.",
+      bucket: (name) => `1 call, \`${name}\` bucket`,
+      key: "key",
+    },
+    quota: {
+      title: "Quota costs",
+      description: "What every method of the YouTube Data API costs, sorted from the cheapest to the most expensive.",
+      intro:
+        "The numbers come from YouTube's [quota calculator](https://developers.google.com/youtube/v3/determine_quota_cost) and from the method pages for the ones the calculator leaves out. They are what `yt.quota` counts and what `quotaCost()` returns. [Quota](/basics/quota/) explains how the buckets work and how to spend less.",
+      own: "Methods with their own bucket",
+      ownNote: "Calls to these are not counted in units of the shared budget. Each has a daily allowance of its own.",
+      columns: "| Method | Default allowance | Cost of a call |",
+      allowance: { "search.list": "100 calls a day", "videos.insert": "100 calls a day", "videos.batchGetStats": "10,000 calls a day" },
+      shared: "Shared budget",
+      sharedNote: "Everything else draws from one budget of 10,000 units a day by default.",
+      units: (units) => `${units} unit${units === 1 ? "" : "s"}`,
+      other: "Analytics and Reporting",
+      otherNote:
+        "The Analytics and Reporting APIs are not billed in units. They have request rate limits of their own, visible in the Google Cloud console. `yt.quota.usage` counts their calls under `analytics` and `reporting` for information.",
+    },
+    exports: {
+      title: "All exports",
+      description: "Everything the package exports, with one line on what each thing is.",
+      intro: "Two entry points: `@ix-xs/youtube.api` runs anywhere `fetch` does, `@ix-xs/youtube.api/node` holds the few helpers that need Node.js itself.",
+      classes: "Classes",
+      functions: "Functions",
+      constants: "Constants",
+      types: "Types",
+      columns: "| Name | What it is |",
+      generated: "Generated types",
+      generatedNote: "These come from Google's API description and follow its names.",
+      resources: "Resources",
+      resourcesNote: (count) =>
+        `${count} resources are addressed by \`part\`. Each has three types: \`Video<"snippet" | "statistics">\` is the resource narrowed to those parts, \`VideoPart\` is the union of its part names, and \`VideoResource\` is the full resource with every part optional (\`Video\` alone means the same).`,
+      schemas: "Other schemas",
+      schemasNote: (count) =>
+        `${count} interfaces describe everything else the API sends or accepts: the parts themselves (\`VideoSnippet\`, \`ChannelStatistics\`), list responses (\`VideoListResponse\`) and nested objects (\`Thumbnail\`, \`ResourceId\`). Types of the Analytics and Reporting APIs carry an \`Analytics\` or \`Reporting\` prefix.`,
+      params: "Parameters",
+      paramsNote: (count) => `One interface per method, named after it: \`VideosListParams\`, \`PlaylistItemsInsertParams\`, \`AnalyticsGroupsListParams\`. There are ${count}.`,
+      methodClasses: "Method classes",
+      methodClassesNote: (count) =>
+        `${count} classes hold the methods of each resource, such as \`PlaylistItemsApi\` behind \`yt.playlistItems\`. You reach them through the client and rarely name them. \`MethodId\` is the union of every method name.`,
+    },
+  },
+  fr: {
+    methods: {
+      title: "Toutes les méthodes",
+      description: (count) => `Les ${count} méthodes des API YouTube Data, Analytics et Reporting, avec ce que fait chacune, ce qu'elle coûte et les identifiants qu'elle demande.`,
+      intro:
+        "Chaque nom de méthode mène à la référence de Google. Les mêmes informations sont dans votre éditeur : survolez une méthode pour voir sa description, son coût en quota et un exemple. Les descriptions viennent du code source, en anglais comme dans votre éditeur.",
+      quota: "- **Quota** est le coût d'un appel, en unités. Trois méthodes puisent dans une enveloppe qui leur est propre : voir [Quota](/basics/quota/).",
+      auth: "- **Auth** vaut `clé` quand une clé d'API suffit pour les données publiques, `OAuth` quand la méthode demande toujours un utilisateur. Une méthode `clé` demande quand même OAuth pour des données privées ou avec des paramètres comme `mine`.",
+      count: (count, live) => `${count} méthodes${live ? ", diffusion en direct comprise" : ""}.`,
+      live: "Diffusion en direct",
+      liveNote: "Ces méthodes font partie de l'API Data et partagent son quota.",
+      guide: (title, link) => `Guide : [${title}](${link}).`,
+      columns: "| Méthode | Ce qu'elle fait | Quota | Auth |",
+      shortColumns: "| Méthode | Ce qu'elle fait |",
+      deprecated: "Dépréciée.",
+      bucket: (name) => `1 appel, enveloppe \`${name}\``,
+      key: "clé",
+    },
+    quota: {
+      title: "Coûts en quota",
+      description: "Ce que coûte chaque méthode de l'API YouTube Data, de la moins chère à la plus chère.",
+      intro:
+        "Les chiffres viennent du [calculateur de quota](https://developers.google.com/youtube/v3/determine_quota_cost) de YouTube et, pour les méthodes qu'il ne liste pas, de leur page de référence. Ce sont ceux que `yt.quota` compte et que `quotaCost()` renvoie. [Quota](/basics/quota/) explique le fonctionnement des enveloppes et comment dépenser moins.",
+      own: "Méthodes avec leur propre enveloppe",
+      ownNote: "Les appels à ces méthodes ne sont pas comptés en unités du budget commun. Chacune a sa propre allocation quotidienne.",
+      columns: "| Méthode | Allocation par défaut | Coût d'un appel |",
+      allowance: { "search.list": "100 appels par jour", "videos.insert": "100 appels par jour", "videos.batchGetStats": "10 000 appels par jour" },
+      shared: "Budget commun",
+      sharedNote: "Tout le reste puise dans un seul budget, de 10 000 unités par jour par défaut.",
+      units: (units) => `${units} unité${units === 1 ? "" : "s"}`,
+      other: "Analytics et Reporting",
+      otherNote:
+        "Les API Analytics et Reporting ne sont pas facturées en unités. Elles ont leurs propres limites de débit, visibles dans la console Google Cloud. `yt.quota.usage` compte leurs appels sous `analytics` et `reporting`, à titre indicatif.",
+    },
+    exports: {
+      title: "Tous les exports",
+      description: "Tout ce que le paquet exporte, avec une ligne sur ce qu'est chaque élément.",
+      intro:
+        "Deux points d'entrée : `@ix-xs/youtube.api` fonctionne partout où `fetch` existe, `@ix-xs/youtube.api/node` regroupe les quelques fonctions qui ont besoin de Node.js lui-même. Les descriptions viennent des commentaires du code source, en anglais comme dans votre éditeur.",
+      classes: "Classes",
+      functions: "Fonctions",
+      constants: "Constantes",
+      types: "Types",
+      columns: "| Nom | Ce que c'est |",
+      generated: "Types générés",
+      generatedNote: "Ils viennent de la description de l'API publiée par Google et en reprennent les noms.",
+      resources: "Ressources",
+      resourcesNote: (count) =>
+        `${count} ressources se lisent par \`part\`. Chacune a trois types : \`Video<"snippet" | "statistics">\` est la ressource réduite à ces parties, \`VideoPart\` est l'union des noms de ses parties, et \`VideoResource\` est la ressource complète, toutes parties optionnelles (\`Video\` seul veut dire la même chose).`,
+      schemas: "Autres schémas",
+      schemasNote: (count) =>
+        `${count} interfaces décrivent tout le reste de ce que l'API envoie ou accepte : les parties elles-mêmes (\`VideoSnippet\`, \`ChannelStatistics\`), les réponses de liste (\`VideoListResponse\`) et les objets imbriqués (\`Thumbnail\`, \`ResourceId\`). Les types des API Analytics et Reporting portent le préfixe \`Analytics\` ou \`Reporting\`.`,
+      params: "Paramètres",
+      paramsNote: (count) => `Une interface par méthode, nommée d'après elle : \`VideosListParams\`, \`PlaylistItemsInsertParams\`, \`AnalyticsGroupsListParams\`. Il y en a ${count}.`,
+      methodClasses: "Classes de méthodes",
+      methodClassesNote: (count) =>
+        `${count} classes portent les méthodes de chaque ressource, comme \`PlaylistItemsApi\` derrière \`yt.playlistItems\`. Vous y accédez par le client et les nommez rarement. \`MethodId\` est l'union de tous les noms de méthodes.`,
+    },
+  },
+};
+
+/** The name of a guide in a language: the title of its translation when there is one. */
+function guideName(address, language) {
+  const slug = address.replace(/^\/|\/$/g, "");
+  const fallback = slug.split("/").pop().replace(/-/g, " ");
+  if (language === "en") return fallback;
+  for (const extension of [".md", ".mdx"]) {
+    const file = path.join(content, language, slug + extension);
+    if (!existsSync(file)) continue;
+    const title = /^title:\s*(.+)$/m.exec(readFileSync(file, "utf8"))?.[1];
+    if (title) return title.trim().replace(/^(["'])(.*)\1$/, "$2");
+  }
+  return fallback;
+}
+
+const NOTICE = `<!-- Generated by docs/scripts/reference.mjs. Edit scripts/api.config.mjs, then run "npm run reference" in docs/. -->`;
 const linked = (method) => (method.docs ? `[\`${method.call}\`](${method.docs})` : `\`${method.call}\``);
 
-function methodsPage() {
+function methodsPage(language) {
+  const words = WORDS[language].methods;
+  const cost = (method) => (method.quota === undefined ? "" : method.bucket ? words.bucket(method.bucket) : String(method.quota));
   const counts = APIS.map((api) => methods.filter((method) => method.api === api).length);
   let out = `---
-title: Every method
-description: The ${methods.length} methods of the YouTube Data, Analytics and Reporting APIs, with what each one does, what it costs and the credentials it needs.
+title: ${words.title}
+description: ${words.description(methods.length)}
 ---
 
-<!-- Generated by docs/scripts/reference.mjs. Edit scripts/api.config.mjs, then run \"npm run reference\" in docs/. -->
+${NOTICE}
 
-Each method name links to Google's reference for it. The same information is in your editor: hover a method to see its description, its quota cost and an example.
+${words.intro}
 
-- **Quota** is the cost of one call in units. Three methods draw from a bucket of their own instead: see [Quota](/basics/quota/).
-- **Auth** is \`key\` when an API key is enough for public data, \`OAuth\` when the method always needs a user. A \`key\` method still needs OAuth for private data or with parameters such as \`mine\`.
+${words.quota}
+${words.auth}
 
 `;
   APIS.forEach((api, index) => {
     const own = methods.filter((method) => method.api === api);
-    const sections = api.key === "data" ? [["", own.filter((method) => !method.live)], ["Live streaming", own.filter((method) => method.live)]] : [["", own]];
-    out += `## ${api.title}\n\n${counts[index]} methods${api.key === "data" ? ", live streaming included" : ""}.\n\n`;
+    const sections = api.key === "data" ? [["", own.filter((method) => !method.live)], [words.live, own.filter((method) => method.live)]] : [["", own]];
+    out += `## ${api.title}\n\n${words.count(counts[index], api.key === "data")}\n\n`;
     for (const [title, list] of sections) {
-      if (title) out += `## ${title}\n\nThese methods are part of the Data API and share its quota.\n\n`;
+      if (title) out += `## ${title}\n\n${words.liveNote}\n\n`;
       const groups = new Map();
       for (const method of list) groups.set(method.resource, [...(groups.get(method.resource) ?? []), method]);
       for (const [resource, group] of [...groups].sort(([a], [b]) => a.localeCompare(b))) {
         group.sort((a, b) => (ORDER.indexOf(a.name) === -1 ? 50 : ORDER.indexOf(a.name)) - (ORDER.indexOf(b.name) === -1 ? 50 : ORDER.indexOf(b.name)) || a.name.localeCompare(b.name));
         out += `### ${resource}\n\n`;
-        if (group[0].guide) out += `Guide: [${group[0].guide.split("/").filter(Boolean).pop().replace(/-/g, " ")}](${group[0].guide}).\n\n`;
-        out += api.key === "data" ? "| Method | What it does | Quota | Auth |\n| --- | --- | --- | --- |\n" : "| Method | What it does |\n| --- | --- |\n";
+        if (group[0].guide) out += `${words.guide(guideName(group[0].guide, language), group[0].guide)}\n\n`;
+        out += api.key === "data" ? `${words.columns}\n| --- | --- | --- | --- |\n` : `${words.shortColumns}\n| --- | --- |\n`;
         for (const method of group) {
-          const what = method.deprecated ? `Deprecated. ${method.summary}` : method.summary;
-          out += api.key === "data" ? `| ${linked(method)} | ${what} | ${cost(method)} | ${method.oauth ? "OAuth" : "key"} |\n` : `| ${linked(method)} | ${what} |\n`;
+          const what = method.deprecated ? `${words.deprecated} ${method.summary}` : method.summary;
+          out += api.key === "data" ? `| ${linked(method)} | ${what} | ${cost(method)} | ${method.oauth ? "OAuth" : words.key} |\n` : `| ${linked(method)} | ${what} |\n`;
         }
         out += "\n";
       }
@@ -160,40 +307,41 @@ Each method name links to Google's reference for it. The same information is in 
   return out;
 }
 
-function quotaPage() {
+function quotaPage(language) {
+  const words = WORDS[language].quota;
   const data = methods.filter((method) => method.api.key === "data");
   const tiers = new Map();
   for (const method of data.filter((item) => !item.bucket)) tiers.set(method.quota, [...(tiers.get(method.quota) ?? []), method]);
   let out = `---
-title: Quota costs
-description: What every method of the YouTube Data API costs, sorted from the cheapest to the most expensive.
+title: ${words.title}
+description: ${words.description}
 ---
 
-<!-- Generated by docs/scripts/reference.mjs. Edit scripts/api.config.mjs, then run \"npm run reference\" in docs/. -->
+${NOTICE}
 
-The numbers come from YouTube's [quota calculator](https://developers.google.com/youtube/v3/determine_quota_cost) and from the method pages for the ones the calculator leaves out. They are what \`yt.quota\` counts and what \`quotaCost()\` returns. [Quota](/basics/quota/) explains how the buckets work and how to spend less.
+${words.intro}
 
-## Methods with their own bucket
+## ${words.own}
 
-Calls to these are not counted in units of the shared budget. Each has a daily allowance of its own.
+${words.ownNote}
 
-| Method | Default allowance | Cost of a call |
+${words.columns}
 | --- | --- | --- |
 `;
-  const allowance = { "search.list": "100 calls a day", "videos.insert": "100 calls a day", "videos.batchGetStats": "10,000 units a day" };
-  for (const method of data.filter((item) => item.bucket)) out += `| \`${method.call}\` | ${allowance[method.bucket]} | 1 |\n`;
-  out += `\n## Shared budget\n\nEverything else draws from one budget of 10,000 units a day by default.\n\n`;
+  for (const method of data.filter((item) => item.bucket)) out += `| \`${method.call}\` | ${words.allowance[method.bucket]} | 1 |\n`;
+  out += `\n## ${words.shared}\n\n${words.sharedNote}\n\n`;
   for (const [units, list] of [...tiers].sort(([a], [b]) => a - b)) {
-    out += `### ${units} unit${units === 1 ? "" : "s"}\n\n`;
+    out += `### ${words.units(units)}\n\n`;
     out += `${list.map((method) => `\`${method.call.replace(/^yt\./, "")}\``).join(", ")}\n\n`;
   }
-  out += `## Analytics and Reporting\n\nThe Analytics and Reporting APIs are not billed in units. They have request rate limits of their own, visible in the Google Cloud console. \`yt.quota.usage\` counts their calls under \`analytics\` and \`reporting\` for information.\n`;
+  out += `## ${words.other}\n\n${words.otherNote}\n`;
   return out;
 }
 
 // ---------------------------------------------------------------- exports
 
-function exportsPage() {
+/** What the two entry points export, read once from the source. */
+function readExports() {
   const entry = path.join(root, "src", "index.ts");
   const nodeEntry = path.join(root, "src", "node.ts");
   const program = ts.createProgram([entry, nodeEntry], {
@@ -226,67 +374,79 @@ function exportsPage() {
 
   const main = describe(entry);
   const node = describe(nodeEntry);
+  const handwritten = main.filter((item) => !item.generated);
+  const generated = main.filter((item) => item.generated);
+  const params = generated.filter((item) => item.kind === "type" && item.name.endsWith("Params"));
+  const partTypes = generated.filter((item) => item.kind === "type" && item.name.endsWith("Part"));
+  const undocumented = handwritten.filter((item) => !item.summary).map((item) => item.name);
+  if (undocumented.length) throw new Error(`Exports without a doc comment: ${undocumented.join(", ")}`);
+  return {
+    node,
+    handwritten,
+    generated,
+    params,
+    resourceClasses: generated.filter((item) => item.kind === "class"),
+    partAware: partTypes.map((item) => item.name.slice(0, -4)).sort(),
+    schemas: generated.filter((item) => item.kind === "type" && !params.includes(item) && !partTypes.includes(item) && item.name !== "MethodId"),
+  };
+}
+
+const exported = readExports();
+
+function exportsPage(language) {
+  const words = WORDS[language].exports;
+  const { node, handwritten, generated, params, resourceClasses, partAware, schemas } = exported;
   const table = (items) =>
-    `| Name | What it is |\n| --- | --- |\n${items
+    `${words.columns}\n| --- | --- |\n${[...items]
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((item) => `| \`${item.name}\` | ${item.summary.replace(/\|/g, "\\|").replace(/\{@link ([^}]+)\}/g, "`$1`") || " "} |`)
       .join("\n")}\n`;
 
-  const handwritten = main.filter((item) => !item.generated);
-  const generated = main.filter((item) => item.generated);
-  const resourceClasses = generated.filter((item) => item.kind === "class");
-  const params = generated.filter((item) => item.kind === "type" && item.name.endsWith("Params"));
-  const partTypes = generated.filter((item) => item.kind === "type" && item.name.endsWith("Part"));
-  const partAware = partTypes.map((item) => item.name.slice(0, -4));
-  const schemas = generated.filter((item) => item.kind === "type" && !params.includes(item) && !partTypes.includes(item) && item.name !== "MethodId");
-  const undocumented = handwritten.filter((item) => !item.summary).map((item) => item.name);
-  if (undocumented.length) throw new Error(`Exports without a doc comment: ${undocumented.join(", ")}`);
-
   return `---
-title: All exports
-description: Everything the package exports, with one line on what each thing is.
+title: ${words.title}
+description: ${words.description}
 ---
 
-<!-- Generated by docs/scripts/reference.mjs from the doc comments of src/. Run \"npm run reference\" in docs/ after changing an export. -->
+<!-- Generated by docs/scripts/reference.mjs from the doc comments of src/. Run "npm run reference" in docs/ after changing an export. -->
 
-Two entry points: \`@ix-xs/youtube.api\` runs anywhere \`fetch\` does, \`@ix-xs/youtube.api/node\` holds the few helpers that need Node.js itself.
+${words.intro}
 
-## Classes
+## ${words.classes}
 
 ${table(handwritten.filter((item) => item.kind === "class"))}
-## Functions
+## ${words.functions}
 
 ${table(handwritten.filter((item) => item.kind === "function"))}
-## Constants
+## ${words.constants}
 
 ${table([...handwritten.filter((item) => item.kind === "constant"), ...generated.filter((item) => item.kind === "constant")])}
-## Types
+## ${words.types}
 
 ${table(handwritten.filter((item) => item.kind === "type"))}
 ## \`@ix-xs/youtube.api/node\`
 
 ${table(node)}
-## Generated types
+## ${words.generated}
 
-These come from Google's API description and follow its names.
+${words.generatedNote}
 
-### Resources
+### ${words.resources}
 
-${partAware.length} resources are addressed by \`part\`. Each has three types: \`Video<"snippet" | "statistics">\` is the resource narrowed to those parts, \`VideoPart\` is the union of its part names, and \`VideoResource\` is the full resource with every part optional (\`Video\` alone means the same).
+${words.resourcesNote(partAware.length)}
 
-${partAware.sort().map((name) => `\`${name}\``).join(", ")}
+${partAware.map((name) => `\`${name}\``).join(", ")}
 
-### Other schemas
+### ${words.schemas}
 
-${schemas.length} interfaces describe everything else the API sends or accepts: the parts themselves (\`VideoSnippet\`, \`ChannelStatistics\`), list responses (\`VideoListResponse\`) and nested objects (\`Thumbnail\`, \`ResourceId\`). Types of the Analytics and Reporting APIs carry an \`Analytics\` or \`Reporting\` prefix.
+${words.schemasNote(schemas.length)}
 
-### Parameters
+### ${words.params}
 
-One interface per method, named after it: \`VideosListParams\`, \`PlaylistItemsInsertParams\`, \`AnalyticsGroupsListParams\`. There are ${params.length}.
+${words.paramsNote(params.length)}
 
-### Method classes
+### ${words.methodClasses}
 
-${resourceClasses.length} classes hold the methods of each resource, such as \`PlaylistItemsApi\` behind \`yt.playlistItems\`. You reach them through the client and rarely name them. \`MethodId\` is the union of every method name.
+${words.methodClassesNote(resourceClasses.length)}
 `;
 }
 
@@ -369,9 +529,15 @@ function partsData(worst = false) {
 // ------------------------------------------------------------------ write
 
 const files = new Map([
-  ["src/content/docs/reference/methods.md", methodsPage()],
-  ["src/content/docs/reference/quota-costs.md", quotaPage()],
-  ["src/content/docs/reference/exports.md", exportsPage()],
+  // English at the root of the content, a translation in the folder of its language.
+  ...LANGUAGES.flatMap((language) => {
+    const folder = `src/content/docs/${language === "en" ? "" : `${language}/`}reference`;
+    return [
+      [`${folder}/methods.md`, methodsPage(language)],
+      [`${folder}/quota-costs.md`, quotaPage(language)],
+      [`${folder}/exports.md`, exportsPage(language)],
+    ];
+  }),
   ["src/data/parts.json", `${JSON.stringify(partsData(), null, 2)}\n`],
   ["src/data/parts.worst.json", `${JSON.stringify(partsData(true), null, 2)}\n`],
 ]);

@@ -13,7 +13,7 @@ const oauth = new OAuth2({
   clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
   redirectUri: "https://example.com/oauth/callback",
   tokens: await loadTokens(), // saved by an earlier run, or undefined
-  onTokens: saveTokens, // called after every exchange and refresh
+  onTokens: saveTokens, // called each time the tokens change
 });
 
 const yt = new YouTube({ oauth });
@@ -36,7 +36,7 @@ const oauth = new OAuth2({
 });
 ```
 
-`redirectUri` must match one configured on the Google side, character for character. `clientSecret` can be left out for a public client (browser, mobile, desktop) that relies on PKCE.
+`redirectUri` must match one registered on the Google side, character for character. `clientSecret` can be left out for a public client (browser, mobile, desktop) that relies on PKCE.
 
 Nothing is sent to Google at this point. The object holds the settings and, later, the tokens.
 
@@ -58,7 +58,7 @@ const { url, state, codeVerifier } = await oauth.authUrl({
 
 Both `state` and `codeVerifier` belong in the visitor's session or in a cookie only your server can read. They are useless after the callback.
 
-`scopes` takes short names, full URLs or the `Scopes` constant. [Scopes](/auth/scopes/) lists them and says which one a task needs.
+`scopes` takes short names, full URLs or the `Scopes` constant. [Scopes](/auth/scopes/) lists them and says which one a task needs. `authUrl()` throws a `YouTubeArgumentError` when there is no scope, or no `redirectUri` on the client or in the options.
 
 The defaults are the ones a server wants:
 
@@ -84,7 +84,9 @@ In the example, `app`, `req` and `res` stand for your framework, and `session` f
 
 ```ts
 app.get("/login", async (req, res) => {
-  const { url, state, codeVerifier } = await oauth.authUrl({ scopes: ["youtube.readonly"] });
+  const { url, state, codeVerifier } = await oauth.authUrl({
+    scopes: ["youtube.readonly"],
+  });
   session.oauthState = state;
   session.codeVerifier = codeVerifier;
   res.redirect(url);
@@ -92,7 +94,9 @@ app.get("/login", async (req, res) => {
 
 app.get("/oauth/callback", async (req, res) => {
   if (!session.oauthState || req.query.state !== session.oauthState) {
-    return res.status(400).send("This answer does not belong to your session.");
+    return res
+      .status(400)
+      .send("This answer does not belong to your session.");
   }
   if (req.query.error) {
     return res.status(400).send(`Google answered: ${req.query.error}`);
@@ -116,7 +120,7 @@ Pass the `OAuth2` object to the client:
 const yt = new YouTube({ oauth });
 ```
 
-Or pass the options and let the client build it. It is then available as `yt.oauth`:
+Or pass the options and let the client build it. It is then available as `yt.oauth`, and it goes through the `fetch` of the client unless you give it its own:
 
 ```ts
 const yt = new YouTube({
@@ -126,17 +130,17 @@ const yt = new YouTube({
 yt.oauth?.canRefresh; // true once there is a refresh token
 ```
 
-You can set `apiKey` next to `oauth`. A token wins when both are usable. While the `OAuth2` object has no usable token yet, public reads go out with the key, so the same client serves the pages before and after sign-in.
+You can set `apiKey` next to `oauth`. A token wins when both are usable, and public reads go out with the key while there is no usable token. [Credentials](/start/credentials/) has the rules.
 
 ## Automatic refresh
 
 From here on you do not handle access tokens. Before each request the client asks `OAuth2` for a valid one.
 
 - An access token that is missing, or that expires within 60 seconds, is refreshed first.
-- If the API still answers 401, the token is refreshed once and the call is replayed.
+- If the API still answers 401 and there is a refresh token, the token is refreshed once and the call is replayed. Uploads, report downloads and the live chat stream are not replayed.
 - Calls that need a refresh at the same moment share one request to Google.
 
-A refresh needs a refresh token. Without one, an expired access token ends the session: the call throws a `YouTubeAuthError` with the code `OAUTH_ERROR`, and the user has to consent again.
+A refresh needs a refresh token. Without one, an expired access token cannot be renewed: a call that needs the user throws a `YouTubeAuthError` with the code `OAUTH_ERROR`, and the user has to consent again.
 
 ## Storing tokens
 
@@ -153,11 +157,11 @@ const oauth = new OAuth2({
 });
 ```
 
-`onTokens` runs after an exchange and after each refresh, with the complete set of tokens. Google only sends the refresh token on first consent, so the library carries the one it has into every later set: saving what you receive is always enough.
+`onTokens` runs each time the tokens change: after an exchange, after each refresh, and after [`revoke()`](#signing-out), which passes an empty object. It receives the complete set of tokens. Google only sends the refresh token on first consent, so the library carries the one it has into every later set: saving what you receive is always enough.
 
-`onTokens` is awaited. If it throws, the call that triggered it fails with a `YouTubeAuthError` whose `cause` is your error. This is deliberate: tokens that could not be saved are not lost silently.
+`onTokens` is awaited. If it throws, the call that triggered it fails with a `YouTubeAuthError` whose code is `OAUTH_ERROR` and whose `cause` is your error. This is deliberate: tokens that could not be saved are not lost silently. The `OAuth2` object keeps the new tokens in memory, so only your stored copy is behind.
 
-To observe changes without being part of the call, subscribe with the method of the same name. It is not awaited and returns a function that unsubscribes:
+To observe changes without being part of the call, subscribe with the method of the same name. A listener is not awaited, and one that throws does not fail the call. The method returns a function that unsubscribes:
 
 ```ts
 const stop = oauth.onTokens((tokens) => {
@@ -174,13 +178,15 @@ A refresh token gives lasting access to the account. Store it like a password, a
 ## Reading the session
 
 ```ts
-oauth.tokens; // { accessToken, refreshToken, expiresAt, scope, tokenType, idToken }
+oauth.tokens; // a copy of the current tokens
 oauth.canRefresh; // true when there is a refresh token
-oauth.isExpired; // true when the access token is missing or expires within 60 seconds
-oauth.grantedScopes; // Set { "youtube.readonly" }, or undefined when the tokens do not say
+oauth.isExpired; // true when the access token is missing or about to expire
+oauth.grantedScopes; // Set { "youtube.readonly" }, or undefined
 ```
 
-These read local state and cost nothing. `tokenInfo()` asks Google instead, which is how you check a token you did not create yourself:
+These read local state and cost nothing. `isExpired` is true when there is no access token, or when it expires within 60 seconds. An access token without `expiresAt` counts as valid. `grantedScopes` is `undefined` when the tokens carry no `scope`.
+
+`tokenInfo()` asks Google instead, which is how you check a token you did not create yourself:
 
 ```ts
 const info = await oauth.tokenInfo();
@@ -191,7 +197,7 @@ info.expiresIn; // seconds left
 info.email; // only when an identity scope was granted
 ```
 
-Pass a string to inspect another access token: `oauth.tokenInfo(someAccessToken)`.
+Without an argument it inspects the current access token, refreshed first when needed. Pass a string to inspect another one: `oauth.tokenInfo(someAccessToken)`.
 
 ## Signing out
 
@@ -202,7 +208,13 @@ await oauth.revoke();
 await db.tokens.delete("main");
 ```
 
-`revoke()` calls `onTokens` with an empty object, and so are the listeners added with `oauth.onTokens()`. That is the moment to delete your stored copy: a store that saves what it receives overwrites the dead tokens with nothing.
+`revoke()` calls `onTokens` with an empty object, and the listeners added with `oauth.onTokens()` receive the same. A store that saves what it receives then holds an empty object, which loads as no tokens at all. Delete the entry as above if you prefer it gone.
+
+Three details:
+
+- It revokes the refresh token when there is one, the access token otherwise. Without any token it does nothing and `onTokens` is not called.
+- When Google refuses the revocation, it throws a `YouTubeAuthError` with the code `OAUTH_ERROR` and keeps the tokens.
+- If `onTokens` throws here, `revoke()` fails with a `YouTubeAuthError` whose code is `OAUTH_ERROR` and whose `cause` is your error, as after a refresh. The tokens are already revoked and cleared, and the listeners have been told.
 
 `setTokens()` replaces the tokens without contacting Google and without calling `onTokens`:
 
@@ -247,7 +259,10 @@ Everything that goes wrong with credentials is a `YouTubeAuthError`. When Google
 try {
   await yt.channels.mine();
 } catch (error) {
-  if (error instanceof YouTubeAuthError && error.oauthError === "invalid_grant") {
+  if (
+    error instanceof YouTubeAuthError &&
+    error.oauthError === "invalid_grant"
+  ) {
     // The refresh token no longer works. Start the consent flow again.
     res.redirect("/login");
   } else {
@@ -258,16 +273,16 @@ try {
 
 | `error.code` | When |
 | --- | --- |
-| `MISSING_CREDENTIALS` | The `OAuth2` object has no tokens yet: call `exchange()` or pass saved `tokens`. Also thrown when a call needs OAuth and the client only has an API key |
-| `OAUTH_ERROR` | Google refused an exchange, a refresh, a revocation or a token inspection. Also: the access token expired and there is no refresh token, or `onTokens` threw |
+| `MISSING_CREDENTIALS` | The `OAuth2` object has no tokens: call `exchange()` or pass saved `tokens`. Also thrown when a call needs OAuth and the client only has an API key, or when the client has no credentials at all |
+| `OAUTH_ERROR` | Google refused an exchange, a refresh, a revocation, a token inspection or a device request. Also: the access token expired and there is no refresh token, `refresh()` was called without one, or `onTokens` threw |
 | `INSUFFICIENT_SCOPE` | The token does not carry a scope the method accepts. See [Scopes](/auth/scopes/) |
 
 | `error.oauthError` | Meaning |
 | --- | --- |
 | `invalid_grant` | The code or the refresh token is no longer valid: used twice, revoked or expired. Send the user through consent again |
-| `redirect_uri_mismatch` | The redirect URI is not one configured on the OAuth client |
+| `redirect_uri_mismatch` | The redirect URI is not one registered on the OAuth client |
 
-The message of an `OAUTH_ERROR` includes the description Google returned. `MISSING_CREDENTIALS` and `INSUFFICIENT_SCOPE` are raised before anything is sent, so they cost no quota. [Errors](/basics/errors/) covers the other error classes.
+When Google refused something, the message of the `OAUTH_ERROR` includes the description Google returned. `MISSING_CREDENTIALS` and `INSUFFICIENT_SCOPE` are raised before anything is sent to the API, so they cost no quota. [Errors](/basics/errors/) covers the other error classes.
 
 ## Reference
 
@@ -279,7 +294,7 @@ The message of an `OAUTH_ERROR` includes the description Google returned. `MISSI
 | `clientSecret` | `string` | Client secret. Leave it out for a public client that uses PKCE |
 | `redirectUri` | `string` | Where Google sends the user back. Must match the client's configuration exactly |
 | `tokens` | `Tokens` | Tokens saved from an earlier session |
-| `onTokens` | `(tokens) => void \| Promise<void>` | Called after an exchange and after each refresh. Awaited |
+| `onTokens` | `(tokens) => void \| Promise<void>` | Called after an exchange, after each refresh, and with `{}` after `revoke()`. Awaited |
 | `fetch` | `typeof fetch` | Custom `fetch` for the calls to Google's OAuth endpoints |
 
 ### `oauth.authUrl(options)`
@@ -307,7 +322,8 @@ The message of an `OAUTH_ERROR` includes the description Google returned. `MISSI
 | `tokenInfo(accessToken?)` | `Promise<TokenInfo>` | Client, scopes and remaining lifetime of a token |
 | `setTokens(tokens)` | `void` | Replaces the tokens |
 | `onTokens(listener)` | `() => void` | Subscribes to token changes |
-| `tokens` | `Tokens` | A copy of the current tokens |
+| `requestDeviceCode()`, `pollDeviceToken()` | | The device flow, see [Scripts and devices](/auth/scripts-and-devices/) |
+| `tokens` | `Readonly<Tokens>` | A copy of the current tokens |
 | `canRefresh` | `boolean` | Whether there is a refresh token |
 | `isExpired` | `boolean` | Whether the access token is missing or about to expire |
 | `grantedScopes` | `ReadonlySet<string> \| undefined` | Granted scopes, short names |
@@ -323,6 +339,8 @@ The message of an `OAUTH_ERROR` includes the description Google returned. `MISSI
 | `scope` | Granted scopes, space separated, as Google returns them |
 | `tokenType` | Always `Bearer` |
 | `idToken` | OpenID Connect identity token, when an `openid` scope was requested |
+
+Every field is optional.
 
 ## See also
 

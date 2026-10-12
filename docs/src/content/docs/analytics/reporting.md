@@ -7,7 +7,9 @@ sidebar:
 
 ```ts
 // Once.
-const job = await yt.reporting.jobs.create({ body: { reportTypeId: "channel_basic_a3", name: "Channel basics" } });
+const job = await yt.reporting.jobs.create({
+  body: { reportTypeId: "channel_basic_a3", name: "Channel basics" },
+});
 
 // A day or two later, and every day after that.
 if (job.id) {
@@ -76,8 +78,9 @@ A job has an `expireTime`: after it, no new report is generated. Reports already
 
 ```ts
 const lastWeek = new Date(Date.now() - 7 * 86_400_000);
+const reports = yt.reporting.reports.list({ jobId, createdAfter: lastWeek });
 
-for await (const report of yt.reporting.reports.list({ jobId, createdAfter: lastWeek })) {
+for await (const report of reports) {
   console.log(report.id, report.startTime, report.endTime, report.createTime);
 }
 ```
@@ -98,9 +101,17 @@ Use `createdAfter` to collect only what is new. Store the `createTime` of the ne
 const since: string | undefined = await db.get("reports:lastCreateTime");
 let newest = since;
 
-for await (const report of yt.reporting.reports.list({ jobId, ...(since ? { createdAfter: since } : {}) })) {
-  await db.insert("reports", { id: report.id, day: report.startTime, csv: await yt.reporting.download(report) });
-  if (report.createTime && (!newest || report.createTime > newest)) newest = report.createTime;
+const reports = yt.reporting.reports.list({
+  jobId,
+  ...(since ? { createdAfter: since } : {}),
+});
+
+for await (const report of reports) {
+  const csv = await yt.reporting.download(report);
+  await db.insert("reports", { id: report.id, day: report.startTime, csv });
+
+  const created = report.createTime;
+  if (created && (!newest || created > newest)) newest = created;
 }
 
 if (newest) await db.set("reports:lastCreateTime", newest);
@@ -132,20 +143,25 @@ const report = await yt.reporting.reports.get({ jobId, reportId });
 const response = await yt.reporting.downloadResponse(report);
 
 if (response.body) {
-  await pipeline(Readable.fromWeb(response.body as ReadableStream), createWriteStream(`report-${report.id}.csv`));
+  await pipeline(
+    Readable.fromWeb(response.body as ReadableStream),
+    createWriteStream(`report-${report.id}.csv`),
+  );
 }
 ```
 
-A download is a single request. It is not retried, and the client's `timeout` does not apply to it. Pass a `signal` to bound it:
+A download makes one attempt. It is never retried, and it has no timeout: neither the `timeout` of the client nor the one of the call applies. Pass a `signal` to bound it:
 
 ```ts
 const report = await yt.reporting.reports.get({ jobId, reportId });
-const csv = await yt.reporting.download(report, { signal: AbortSignal.timeout(60_000) });
+const csv = await yt.reporting.download(report, {
+  signal: AbortSignal.timeout(60_000),
+});
 ```
 
 ### The check on the download host
 
-A download carries your access token. Before sending it, the client checks the URL: it must be `https` and its host must be `youtubereporting.googleapis.com`. Anything else throws a `YouTubeArgumentError` and nothing is sent.
+A download carries your access token. So the client only sends it to `https://youtubereporting.googleapis.com`. A URL with another scheme or another host throws a `YouTubeArgumentError`, and nothing is sent.
 
 ```ts
 try {
@@ -164,18 +180,24 @@ Every method of `reportTypes`, `jobs` and `reports` accepts `onBehalfOfContentOw
 ```ts
 const owner = "CONTENT_OWNER_ID";
 
-const types = await yt.reporting.reportTypes.list({ onBehalfOfContentOwner: owner }).all();
-const jobs = await yt.reporting.jobs.list({ onBehalfOfContentOwner: owner }).all();
+const types = await yt.reporting.reportTypes
+  .list({ onBehalfOfContentOwner: owner })
+  .all();
+const jobs = await yt.reporting.jobs
+  .list({ onBehalfOfContentOwner: owner })
+  .all();
 
 for (const job of jobs) {
   if (!job.id) continue;
-  for await (const report of yt.reporting.reports.list({ jobId: job.id, onBehalfOfContentOwner: owner })) {
-    console.log(job.name, report.startTime);
-  }
+  const reports = yt.reporting.reports.list({
+    jobId: job.id,
+    onBehalfOfContentOwner: owner,
+  });
+  for await (const report of reports) console.log(job.name, report.startTime);
 }
 ```
 
-Pass it on each call, or once with the `onBehalfOfContentOwner` option of the client, which applies to these methods too. `download` takes no such parameter: it uses the URL of the report as it is.
+Pass it on each call, or once with the `onBehalfOfContentOwner` option of the client, which applies to these methods too: see [Configuration](/basics/configuration/). `download` takes no such parameter: it uses the URL of the report as it is.
 
 ## Reporting or Analytics
 
@@ -239,7 +261,7 @@ The three `list` methods return a [list request](/basics/lists/): await it for a
 | `downloadUrl` | Where to download it. Pass the report itself to `download` |
 | `jobExpireTime` | When the job of this report expires |
 
-Every field is optional in the types: check `id` before you rely on it.
+Every field of the three is optional in the types: check `id` before you rely on it.
 
 ## Limits and errors
 
@@ -250,16 +272,17 @@ Scopes, any one of:
 | `yt-analytics.readonly` | `Scopes.analytics` |
 | `yt-analytics-monetary.readonly` | `Scopes.analyticsMonetary` |
 
-With an API key only, every call throws a `YouTubeAuthError` with the code `MISSING_CREDENTIALS` before anything is sent. A token that has neither scope throws `INSUFFICIENT_SCOPE`.
+With an API key only, every call throws a `YouTubeAuthError` with the code `MISSING_CREDENTIALS` before anything is sent. When the client knows the scopes of the token and it has neither, the call throws `INSUFFICIENT_SCOPE`.
 
 Google does not bill Reporting calls in quota units. The client counts them for your information, one per call and per download, under `yt.quota.usage.reporting`. They never touch the Data API bucket.
 
 | Situation | What you get |
 | --- | --- |
-| A download URL on another host, or not `https` | `YouTubeArgumentError`, nothing sent |
+| A download URL on another host or port, not `https`, or not a URL at all | `YouTubeArgumentError`, nothing sent |
 | A report without `downloadUrl` | `YouTubeArgumentError`, nothing sent |
 | A download the server refuses | `YouTubeApiError` with the status |
-| A download that fails on the network | `YouTubeRequestError`, code `NETWORK`. Not retried |
+| A download that fails on the network, before the answer or while `download()` reads the file | `YouTubeRequestError`, code `NETWORK`. Not retried |
+| A download whose `signal` is aborted | `YouTubeRequestError`, code `ABORTED` |
 
 ## See also
 

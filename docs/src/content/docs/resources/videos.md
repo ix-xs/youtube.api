@@ -9,8 +9,11 @@ sidebar:
 const video = await yt.videos.get("https://youtu.be/dQw4w9WgXcQ");
 
 if (video) {
+  const { duration } = video.contentDetails;
+  const { viewCount } = video.statistics;
+
   console.log(video.snippet.title);
-  console.log(formatDuration(video.contentDetails.duration), formatCount(video.statistics.viewCount));
+  console.log(formatDuration(duration), formatCount(viewCount));
 }
 ```
 
@@ -49,12 +52,14 @@ The result keeps the order you gave. Videos that do not exist or are private are
 
 ## Listing popular videos
 
-`yt.videos.popular` lists the most popular videos of a region, optionally within a category. It costs 1 unit per page of 50.
+`yt.videos.popular` lists the most popular videos of a region, optionally within a category. It costs 1 unit per page of 50. Awaited, it returns a page of 50.
 
 ```ts
 const top = await yt.videos.popular({ regionCode: "FR" }).take(10);
 
-const gaming = await yt.videos.popular({ regionCode: "US", videoCategoryId: VideoCategories.Gaming }).take(25);
+const gaming = await yt.videos
+  .popular({ regionCode: "US", videoCategoryId: VideoCategories.Gaming })
+  .take(25);
 ```
 
 Since July 2025 the chart is built from the trending Music, Movies and Gaming charts.
@@ -72,12 +77,14 @@ The three helpers above call `yt.videos.list`. It costs 1 unit and takes exactly
 | `myRating` | The videos the authenticated user liked (`"like"`) or disliked (`"dislike"`) | OAuth |
 
 ```ts
-const liked = await yt.videos.list({ part: "snippet", myRating: "like" }).take(100);
+const liked = await yt.videos
+  .list({ part: "snippet", myRating: "like" })
+  .take(100);
 
 for (const video of liked) console.log(video.snippet.title);
 ```
 
-`maxResults` and `pageToken` apply to `chart` and `myRating`. A lookup by `id` returns exactly those ids: lists longer than 50 are split into calls of 50 and merged.
+`maxResults` and `pageToken` apply to `chart` and `myRating`. Awaited without `maxResults`, the raw method returns the API's default page of 5, where `popular` asks for 50. A lookup by `id` returns exactly those ids: lists longer than 50 are split into calls of 50 and merged.
 
 ## Reading the parts
 
@@ -100,20 +107,22 @@ Statistics are strings, because they are 64-bit integers. Only the view count is
 | Field | Type | Notes |
 | --- | --- | --- |
 | `viewCount` | `string` | Always there |
-| `likeCount` | `string \| undefined` | The owner can hide it |
+| `likeCount` | `string \| undefined` | Absent when the owner hides it |
 | `commentCount` | `string \| undefined` | Absent when comments are off |
 | `dislikeCount` | `string \| undefined` | Optional in the type |
 
-In the snippet, `tags` and `defaultLanguage` are optional. Thumbnails are all optional too: [`bestThumbnail`](/basics/ids-and-urls/#formatting) picks the largest one there is.
+In the snippet, `tags`, `defaultLanguage` and `defaultAudioLanguage` are optional. Thumbnails are all optional too: [`bestThumbnail`](/basics/ids-and-urls/#formatting) picks the largest one there is.
 
 Some parts stay optional even when you request them, because they only exist in some situations. `liveStreamingDetails` is the common one. [Parts and types](/basics/parts-and-types/) explains the rule.
 
 ## Telling a live video from a regular one
 
-`snippet.liveBroadcastContent` says whether a video is live right now, scheduled, or neither. `liveStreamingDetails` is only present for an upcoming, live or completed broadcast, so it tells a past stream from a regular upload.
+`snippet.liveBroadcastContent` is `"live"` while a video is live and `"upcoming"` while it is scheduled. `liveStreamingDetails` is only present for an upcoming, live or completed broadcast, so it tells a past stream from a regular upload.
 
 ```ts
-const video = await yt.videos.get(videoId, { part: ["snippet", "liveStreamingDetails"] });
+const video = await yt.videos.get(videoId, {
+  part: ["snippet", "liveStreamingDetails"],
+});
 
 if (video) {
   const live = video.liveStreamingDetails;
@@ -126,7 +135,8 @@ if (video) {
       console.log("Starts at", live?.scheduledStartTime);
       break;
     default:
-      console.log(live ? `A past broadcast, ended at ${live.actualEndTime}` : "A regular upload");
+      if (live) console.log("A past broadcast, ended at", live.actualEndTime);
+      else console.log("A regular upload");
   }
 }
 ```
@@ -146,7 +156,11 @@ if (video) {
   await yt.videos.update({
     body: {
       id: video.id,
-      snippet: { ...video.snippet, title: "A better title", tags: [...(video.snippet.tags ?? []), "typescript"] },
+      snippet: {
+        ...video.snippet,
+        title: "A better title",
+        tags: [...(video.snippet.tags ?? []), "typescript"],
+      },
     },
   });
 }
@@ -160,7 +174,12 @@ The same goes for the other parts. To publish a private video, read `status` and
 const video = await yt.videos.get(videoId, { part: "status" });
 
 if (video) {
-  await yt.videos.update({ body: { id: video.id, status: { ...video.status, privacyStatus: "public" } } });
+  await yt.videos.update({
+    body: {
+      id: video.id,
+      status: { ...video.status, privacyStatus: "public" },
+    },
+  });
 }
 ```
 
@@ -172,7 +191,10 @@ const video = await yt.videos.get(videoId, { part: "snippet" });
 if (video) {
   const updated = await yt.videos.update({
     part: "snippet",
-    body: { id: video.id, snippet: { ...video.snippet, categoryId: VideoCategories.Education } },
+    body: {
+      id: video.id,
+      snippet: { ...video.snippet, categoryId: VideoCategories.Education },
+    },
   });
 
   updated.snippet.categoryId; // "27"
@@ -194,7 +216,7 @@ await yt.videos.unrate(videoId); // removes the like or the dislike
 
 `ratingOf` resolves to `"like"`, `"dislike"` or `"none"`. All four helpers accept an id or a URL.
 
-The raw methods are `rate` and `getRating`. `getRating` takes a list of ids and answers for each:
+The raw methods are `rate` and `getRating`. They take ids only. `getRating` takes one id or a list and answers for each:
 
 ```ts
 await yt.videos.rate({ id: videoId, rating: "like" });
@@ -203,13 +225,16 @@ const { items } = await yt.videos.getRating({ id: ids });
 for (const item of items) console.log(item.videoId, item.rating);
 ```
 
-When the owner turned ratings off, `rate` fails with the reason `videoRatingDisabled`:
+When ratings are disabled on a video, `rate` fails with the reason `videoRatingDisabled`:
 
 ```ts
 try {
   await yt.videos.like(videoId);
 } catch (error) {
-  if (error instanceof YouTubeApiError && error.reason === "videoRatingDisabled") {
+  if (
+    error instanceof YouTubeApiError &&
+    error.reason === "videoRatingDisabled"
+  ) {
     console.log("Ratings are off on this video");
   } else {
     throw error;
@@ -230,17 +255,28 @@ await yt.videos.delete({ id: videoId });
 `yt.videos.reportAbuse` reports a video for abusive content, with OAuth, for 50 units. The reason is an id from `yt.videoAbuseReportReasons.list`, which costs 1 unit:
 
 ```ts
-const { items } = await yt.videoAbuseReportReasons.list({ part: "snippet", hl: "en" });
+const { items } = await yt.videoAbuseReportReasons.list({
+  part: "snippet",
+  hl: "en",
+});
 
 for (const reason of items) {
   console.log(reason.id, reason.snippet.label);
-  for (const secondary of reason.snippet.secondaryReasons ?? []) console.log("  ", secondary.id, secondary.label);
+
+  for (const secondary of reason.snippet.secondaryReasons ?? []) {
+    console.log("  ", secondary.id, secondary.label);
+  }
 }
 ```
 
 ```ts
 await yt.videos.reportAbuse({
-  body: { videoId, reasonId: "S", comments: "Repeated links to a scam site", language: "en" },
+  body: {
+    videoId,
+    reasonId: "S",
+    comments: "Repeated links to a scam site",
+    language: "en",
+  },
 });
 ```
 
@@ -251,10 +287,16 @@ await yt.videos.reportAbuse({
 `yt.videoCategories.list` lists the categories available in a region, or fetches categories by id. It costs 1 unit.
 
 ```ts
-const { items } = await yt.videoCategories.list({ part: "snippet", regionCode: "FR", hl: "fr" });
+const { items } = await yt.videoCategories.list({
+  part: "snippet",
+  regionCode: "FR",
+  hl: "fr",
+});
 
 const assignable = items.filter((category) => category.snippet.assignable);
-for (const category of assignable) console.log(category.id, category.snippet.title);
+for (const category of assignable) {
+  console.log(category.id, category.snippet.title);
+}
 ```
 
 A video's category is `snippet.categoryId`. The ids do not change from one region to another, so the `VideoCategories` constant covers the common case without a call:
@@ -269,15 +311,34 @@ When you do list them, give the method a long [cache](/basics/caching/) lifetime
 
 ## Polling statistics
 
-`yt.videos.batchGetStats` fetches fresh statistics for many videos. It draws from [its own bucket](/basics/quota/#buckets), 10,000 calls a day by default, so polling view counts does not eat into the shared budget. One call covers 50 ids. Longer lists are split, at one call per 50.
+`yt.videos.batchGetStats` fetches fresh statistics for many videos. It draws from [its own bucket](/basics/quota/#buckets), 10,000 calls a day by default, so polling view counts does not eat into the shared budget. `id` is required. One call covers 50 ids. Longer lists are split, at one call per 50.
 
 ```ts
-const { items } = await yt.videos.batchGetStats({ part: "statistics", id: ids });
+const { items } = await yt.videos.batchGetStats({
+  part: "statistics",
+  id: ids,
+});
 
-for (const stat of items) console.log(stat.id, stat.statistics.viewCount, stat.statistics.likeCount);
+for (const stat of items) {
+  console.log(stat.id, stat.statistics.viewCount, stat.statistics.likeCount);
+}
 ```
 
 The result is not a video but a lighter resource with three parts: `statistics` (`viewCount`, `likeCount`, `commentCount`), `snippet` (`publishTime`) and `contentDetails` (`duration`). Use `videos.list` for anything else.
+
+Here the duration is not ISO 8601. It is a number of seconds followed by `s`, which `parseDuration` and `formatDuration` read too:
+
+```ts
+const { items } = await yt.videos.batchGetStats({
+  part: "contentDetails",
+  id: ids,
+});
+
+for (const stat of items) {
+  const { duration } = stat.contentDetails; // "212s", or undefined
+  if (duration) console.log(stat.id, parseDuration(duration)); // 212
+}
+```
 
 ## Checking the AI training permission
 
@@ -344,6 +405,7 @@ Parts of a video:
 | `ageGating` | Age restriction details. Owner only | No |
 | `monetizationDetails` | Whether the video can be monetized | No |
 | `brandPartner` | The brand partner linked to the video | No |
+| `projectDetails` | Deprecated | No |
 | `id` | Nothing more: `kind`, `etag` and `id` are on every result | Yes |
 
 ## See also

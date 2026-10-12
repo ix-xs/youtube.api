@@ -6,11 +6,13 @@ sidebar:
 ---
 
 ```ts
-const threads = await yt.commentThreads.forVideo(videoId, { order: "relevance" }).take(20);
+const threads = await yt.commentThreads
+  .forVideo(videoId, { order: "relevance" })
+  .take(20);
 
 for (const thread of threads) {
   const comment = thread.snippet.topLevelComment.snippet;
-  console.log(comment?.authorDisplayName, comment?.textDisplay);
+  console.log(comment.authorDisplayName, comment.textDisplay);
 }
 ```
 
@@ -28,8 +30,11 @@ The id of a thread is also the id of its top-level comment.
 `yt.commentThreads.forVideo` takes a video id or URL. It works with an API key and costs 1 quota unit per page of up to 100 threads.
 
 ```ts
-for await (const thread of yt.commentThreads.forVideo("https://youtu.be/dQw4w9WgXcQ", { textFormat: "plainText" })) {
-  console.log(thread.snippet.topLevelComment.snippet?.textDisplay);
+const url = "https://youtu.be/dQw4w9WgXcQ";
+const threads = yt.commentThreads.forVideo(url, { textFormat: "plainText" });
+
+for await (const thread of threads) {
+  console.log(thread.snippet.topLevelComment.snippet.textDisplay);
 }
 ```
 
@@ -40,12 +45,14 @@ That loop walks every thread of the video, 100 per call. A video with 10,000 top
 | `order` | `"time"`, `"relevance"` | Sort order |
 | `searchTerms` | Text | Only threads that match these words |
 | `textFormat` | `"html"` (default), `"plainText"` | Format of `textDisplay` |
-| `moderationStatus` | `"published"`, `"heldForReview"`, `"likelySpam"` | Only threads in this moderation status |
-| `maxResults` | 1-100, default 20 | Size of a page, when you await a single one |
+| `moderationStatus` | `"published"` (default), `"heldForReview"`, `"likelySpam"` | Only threads in this moderation status. The last two are only visible to the owner of the channel or video |
+| `maxResults` | 1-100 | Size of a page. Left out, the helper asks for 100 |
 | `part` | `"snippet"` (default), `"replies"`, `"id"` | Parts to fetch |
 
 ```ts
-const mentions = await yt.commentThreads.forVideo(videoId, { searchTerms: "subtitles", order: "time" }).take(50);
+const mentions = await yt.commentThreads
+  .forVideo(videoId, { searchTerms: "subtitles", order: "time" })
+  .take(50);
 ```
 
 ## The shape of a thread
@@ -60,20 +67,20 @@ if (thread) {
   thread.snippet.videoId; // string | undefined
 
   const top = thread.snippet.topLevelComment;
-  top.id; // string | undefined
-  top.snippet?.textDisplay; // string | undefined
-  top.snippet?.likeCount; // number | undefined
+  top.id; // string
+  top.snippet.textDisplay; // string
+  top.snippet.likeCount; // number
 }
 ```
 
-`topLevelComment` is typed as a full comment resource, with every part optional. That is why its `snippet` needs `?.`.
+A comment nested in a thread, `topLevelComment` or an inline reply, is typed with its `snippet`. No `?.` is needed to read it.
 
 Inside the snippet of a comment:
 
 | Field | Type | Notes |
 | --- | --- | --- |
 | `textDisplay` | `string` | The text as displayed, in HTML or plain text depending on `textFormat`. It can differ from what was typed: links to videos become titles, for example |
-| `textOriginal` | `string` | The raw text as posted or last edited. Only guaranteed when you are the author |
+| `textOriginal` | `string \| undefined` | The raw text as posted or last edited. Only guaranteed when you are the author |
 | `authorDisplayName`, `authorProfileImageUrl`, `authorChannelUrl` | `string` | The author |
 | `authorChannelId` | `{ value?: string } \| undefined` | The author's channel id, under `value` |
 | `likeCount` | `number` | A number, unlike the counts of videos and channels |
@@ -81,7 +88,7 @@ Inside the snippet of a comment:
 | `viewerRating` | `"none" \| "like" \| "dislike"` | How the authenticated user rated the comment |
 | `parentId` | `string \| undefined` | Id of the top-level comment. Only set on replies |
 | `videoId`, `channelId` | `string \| undefined` | What the comment is about |
-| `moderationStatus` | `string \| undefined` | Not set when the comment was fetched by id |
+| `moderationStatus` | `"published" \| "heldForReview" \| "likelySpam" \| "rejected" \| undefined` | Not set when the comment was fetched by id |
 | `imageUrl` | `string \| undefined` | Only when the comment has an image or a GIF. The link expires after six hours |
 
 ## Reading replies
@@ -89,13 +96,17 @@ Inside the snippet of a comment:
 Ask for the `replies` part and each thread comes with up to five replies inline. The part is optional in the type, because a thread without replies has none.
 
 ```ts
-const threads = await yt.commentThreads.forVideo(videoId, { part: ["snippet", "replies"] }).take(20);
+const threads = await yt.commentThreads
+  .forVideo(videoId, { part: ["snippet", "replies"] })
+  .take(20);
 
 for (const thread of threads) {
   const inline = thread.replies?.comments ?? [];
-  console.log(thread.snippet.totalReplyCount, "replies,", inline.length, "inline");
+  const { totalReplyCount } = thread.snippet;
 
-  for (const reply of inline) console.log("  ", reply.snippet?.textDisplay);
+  console.log(totalReplyCount, "replies,", inline.length, "inline");
+
+  for (const reply of inline) console.log("  ", reply.snippet.textDisplay);
 }
 ```
 
@@ -105,34 +116,40 @@ For all the replies of a thread, use `yt.comments.replies` with the thread id. I
 const threads = await yt.commentThreads.forVideo(videoId).take(20);
 
 for (const thread of threads) {
-  if (thread.snippet.totalReplyCount === 0) continue; // nothing to fetch, nothing to pay
+  // Nothing to fetch, nothing to pay.
+  if (thread.snippet.totalReplyCount === 0) continue;
 
-  for await (const reply of yt.comments.replies(thread.id, { textFormat: "plainText" })) {
+  const replies = yt.comments.replies(thread.id, { textFormat: "plainText" });
+
+  for await (const reply of replies) {
     console.log(reply.snippet.authorDisplayName, reply.snippet.textDisplay);
   }
 }
 ```
 
-Here `reply.snippet` is required: the helper asks for the `snippet` part and the type follows.
-
-A good pattern for a full export: request `replies` with the threads, and only call `yt.comments.replies` for the threads whose `totalReplyCount` is larger than what came inline. [Export comments](/recipes/export-comments/) is the recipe for a full export.
+For a full export, request `replies` with the threads, and call `yt.comments.replies` only for the threads whose `totalReplyCount` is larger than what came inline. [Export comments](/recipes/export-comments/) is the recipe.
 
 ## Posting a comment
 
 `yt.commentThreads.post` posts a top-level comment on a video. It needs OAuth and costs 50 units.
 
 ```ts
-const thread = await yt.commentThreads.post(videoId, "Thanks for the walkthrough, the part on generics helped.");
+const thread = await yt.commentThreads.post(
+  videoId,
+  "Thanks for the walkthrough, the part on generics helped.",
+);
 
-console.log(thread.id, thread.snippet.topLevelComment.snippet?.textDisplay);
+console.log(thread.id, thread.snippet.topLevelComment.snippet.textDisplay);
 ```
 
 ## Replying to a comment
 
-`yt.comments.reply` takes the id of the top-level comment, which is the id of the thread. It costs 50 units.
+`yt.comments.reply` takes the id of the top-level comment, which is the id of the thread. It needs OAuth and costs 50 units.
 
 ```ts
-const thread = await yt.commentThreads.forVideo(videoId, { order: "time" }).first();
+const thread = await yt.commentThreads
+  .forVideo(videoId, { order: "time" })
+  .first();
 
 if (thread) {
   const reply = await yt.comments.reply(thread.id, "Thanks!");
@@ -144,10 +161,14 @@ YouTube has one level of replies. To answer a reply, reply to its thread: the id
 
 ## Editing and deleting
 
-`yt.comments.edit` replaces the text of one of your comments. `yt.comments.delete` deletes a comment. Each costs 50 units.
+`yt.comments.edit` replaces the text of one of your comments. `yt.comments.delete` deletes a comment. Each needs OAuth and costs 50 units.
 
 ```ts
-const edited = await yt.comments.edit(commentId, "Thanks! (edited: fixed the link)");
+const edited = await yt.comments.edit(
+  commentId,
+  "Thanks! (edited: fixed the link)",
+);
+
 console.log(edited.snippet.textOriginal, edited.snippet.updatedAt);
 
 await yt.comments.delete({ id: commentId });
@@ -158,21 +179,40 @@ await yt.comments.delete({ id: commentId });
 `yt.comments.setModerationStatus` publishes, holds for review or rejects comments on your channel or your videos. It takes one id or a list, and costs 50 units per call.
 
 ```ts
-const held = await yt.commentThreads.forVideo(videoId, { moderationStatus: "heldForReview" }).take(50);
+const held = await yt.commentThreads
+  .forVideo(videoId, { moderationStatus: "heldForReview" })
+  .take(50);
 
-for (const thread of held) console.log(thread.id, thread.snippet.topLevelComment.snippet?.textOriginal);
+for (const thread of held) {
+  console.log(thread.id, thread.snippet.topLevelComment.snippet.textOriginal);
+}
 
 // Approve them all in one call.
-await yt.comments.setModerationStatus({ id: held.map((thread) => thread.id), moderationStatus: "published" });
+await yt.comments.setModerationStatus({
+  id: held.map((thread) => thread.id),
+  moderationStatus: "published",
+});
 ```
 
 `banAuthor: true` also adds the author to the ban list, so their future comments are rejected automatically. It is only valid together with `"rejected"`.
 
 ```ts
-await yt.comments.setModerationStatus({ id: commentId, moderationStatus: "rejected", banAuthor: true });
+await yt.comments.setModerationStatus({
+  id: commentId,
+  moderationStatus: "rejected",
+  banAuthor: true,
+});
 ```
 
-The statuses you can set are `"published"`, `"heldForReview"` and `"rejected"`. The type also allows `"likelySpam"`, which exists as a status to filter on but cannot be set through this call.
+The statuses you can set are `"published"`, `"heldForReview"` and `"rejected"`. `"likelySpam"` is a status to filter on, not one to set, and the type refuses it:
+
+```ts
+await yt.comments.setModerationStatus({
+  id: commentId,
+  // @ts-expect-error "likelySpam" can be read, not set
+  moderationStatus: "likelySpam",
+});
+```
 
 `yt.comments.markAsSpam` is deprecated: YouTube no longer supports it. Reject the comment with `setModerationStatus` instead.
 
@@ -181,10 +221,17 @@ The statuses you can set are `"published"`, `"heldForReview"` and `"rejected"`. 
 The raw `yt.commentThreads.list` takes other filters than a video. `allThreadsRelatedToChannelId` returns the threads of every video of a channel, and the comments on the channel itself. It costs 1 unit per page of up to 100, like the rest.
 
 ```ts
-const recent = await yt.commentThreads.list({ part: "snippet", allThreadsRelatedToChannelId: channelId, order: "time" }).take(100);
+const recent = await yt.commentThreads
+  .list({
+    part: "snippet",
+    allThreadsRelatedToChannelId: channelId,
+    order: "time",
+  })
+  .take(100);
 
 for (const thread of recent) {
-  console.log(thread.snippet.videoId, thread.snippet.topLevelComment.snippet?.textDisplay);
+  const top = thread.snippet.topLevelComment;
+  console.log(thread.snippet.videoId, top.snippet.textDisplay);
 }
 ```
 
@@ -198,8 +245,14 @@ for (const thread of recent) {
 `yt.comments.list` fetches comments by `id`, or the replies of a comment with `parentId`, which is what `yt.comments.replies` uses.
 
 ```ts
-const { items } = await yt.comments.list({ part: "snippet", id: [commentId], textFormat: "plainText" });
+const { items } = await yt.comments.list({
+  part: "snippet",
+  id: [commentId],
+  textFormat: "plainText",
+});
 ```
+
+Awaited without `maxResults`, the two raw `list` methods return the API's default page of 20, where `forVideo` and `replies` ask for 100.
 
 ## What it costs
 
@@ -213,13 +266,15 @@ Reads are cheap and writes are not: 200 replies in a day use the whole default b
 
 ## Scope and credentials
 
-Reading works with an API key. Every write needs OAuth with the `youtube.force-ssl` scope. It is the only scope the comment methods accept, so with OAuth the reads need it too.
+Reading works with an API key. Every write needs OAuth with the `youtube.force-ssl` scope, the only one the comment methods accept.
 
 ```ts
 const { url } = await oauth.authUrl({ scopes: ["youtube.force-ssl"] });
 ```
 
-The client checks before sending. A write with only an API key throws a `YouTubeAuthError` with the code `MISSING_CREDENTIALS`. A token granted without the scope throws one with the code `INSUFFICIENT_SCOPE`. Neither costs quota. [Scopes](/auth/scopes/) has the details.
+The client checks before sending. A write with only an API key throws a `YouTubeAuthError` with the code `MISSING_CREDENTIALS`. A write with a token granted without the scope throws one with the code `INSUFFICIENT_SCOPE`. Neither costs quota.
+
+A read with such a token goes out with the API key when the client has one. Without a key, it throws `INSUFFICIENT_SCOPE` too. [Scopes](/auth/scopes/) has the details.
 
 ## Handling errors
 
@@ -229,15 +284,17 @@ A call the API refuses throws a `YouTubeApiError`. The reasons worth a branch:
 | --- | --- |
 | `commentsDisabled` | Comments are turned off on the video |
 | `forbidden` | The request is not allowed with these credentials |
-| `videoNotFound`, `commentThreadNotFound`, `commentNotFound` | The video, the thread or the comment does not exist |
+| `videoNotFound`, `commentThreadNotFound`, `commentNotFound` | The video, the thread or the comment was not found |
 
 ```ts
 try {
   await yt.commentThreads.post(videoId, "Nice one");
 } catch (error) {
-  if (error instanceof YouTubeApiError && error.reason === "commentsDisabled") {
+  if (!(error instanceof YouTubeApiError)) throw error;
+
+  if (error.reason === "commentsDisabled") {
     console.log("Comments are turned off on this video");
-  } else if (error instanceof YouTubeApiError && error.reason === "forbidden") {
+  } else if (error.reason === "forbidden") {
     console.log("Not allowed:", error.message);
   } else {
     throw error;

@@ -16,7 +16,7 @@ const { ok, data } = await youtube.getChannelById("UC_x5XG1OV2P6uZZ5FSM9Ttw");
 import { YouTube } from "@ix-xs/youtube.api";
 
 const yt = new YouTube({ apiKey: process.env.YOUTUBE_API_KEY });
-const channel = await yt.channels.get("UC_x5XG1OV2P6uZZ5FSM9Ttw");
+const channel = await yt.channels.get("UC_x5XG1OV2P6uZZ5FSM9Ttw"); // 1 unit
 ```
 
 ## What changed
@@ -32,7 +32,7 @@ const channel = await yt.channels.get("UC_x5XG1OV2P6uZZ5FSM9Ttw");
 
 ## The import
 
-The class is now a named export, and its name has a capital T.
+The class is now a named export, `YouTube`.
 
 ```js
 // 1.x
@@ -52,7 +52,7 @@ const { YouTube } = require("@ix-xs/youtube.api");
 const yt = new YouTube({ apiKey: process.env.YOUTUBE_API_KEY });
 ```
 
-The constructor still takes `{ apiKey }`. With no argument it reads the `YOUTUBE_API_KEY` environment variable. [Credentials](/start/credentials/) has the details.
+The constructor still takes `{ apiKey }`. Without `apiKey` it reads the `YOUTUBE_API_KEY` environment variable. [Credentials](/start/credentials/) has the details.
 
 ## getChannelByUsername
 
@@ -65,7 +65,9 @@ if (result.ok) console.log(result.data);
 ```ts
 // 2.x
 const channel = await yt.channels.get("GoogleDevelopers");
-if (channel) console.log(channel.snippet.title, channel.statistics.subscriberCount);
+if (channel) {
+  console.log(channel.snippet.title, channel.statistics.subscriberCount);
+}
 ```
 
 `yt.channels.get` takes a channel in any form: an id, an `@handle`, a legacy username or a channel URL. It resolves to `null` when nothing matches.
@@ -80,7 +82,9 @@ await yt.channels.get("@GoogleDevelopers");
 await yt.channels.get("https://www.youtube.com/user/GoogleDevelopers");
 
 // A legacy username, through the raw method: 1 unit.
-await yt.channels.list({ part: ["snippet", "statistics"], forUsername: "GoogleDevelopers" }).first();
+await yt.channels
+  .list({ part: ["snippet", "statistics"], forUsername: "GoogleDevelopers" })
+  .first();
 ```
 
 ## getChannelById
@@ -126,7 +130,8 @@ It resolves to `null` when the channel has no upload. It costs 2 units: one to r
 
 ```js
 // 1.x
-const result = await youtube.getLastVideoByChannelId("UC_x5XG1OV2P6uZZ5FSM9Ttw");
+const id = "UC_x5XG1OV2P6uZZ5FSM9Ttw";
+const result = await youtube.getLastVideoByChannelId(id);
 if (result.ok) console.log(result.data.title, result.data.resourceId.videoId);
 ```
 
@@ -156,7 +161,7 @@ if (video) console.log(video.snippet.title, video.id);
 You also get what a playlist item does not carry:
 
 ```ts
-const video = await yt.channels.latestVideo(channelId);
+const video = await yt.channels.latestVideo(channelId); // 2 units
 
 if (video) {
   video.contentDetails.duration; // "PT4M13S"
@@ -211,9 +216,9 @@ Three things to keep in mind:
 
 - A channel that does not exist is not an API error. `yt.channels.get` resolves to `null`. `yt.channels.latestVideo` resolves to `null` for a channel without uploads, and throws a `YouTubeArgumentError` when the channel itself cannot be found.
 - `error.status` is the HTTP status. `error.code` and `error.reason` are easier to branch on: `isYouTubeError(error, "QUOTA_EXCEEDED")`, `error.reason === "keyInvalid"`.
-- Rate limits, server errors and network failures are retried before anything is thrown.
+- These calls are reads. For a read, rate limits, server errors and network failures are retried before anything is thrown.
 
-[Errors](/basics/errors/) lists every class and code.
+[Errors](/basics/errors/) lists the classes and codes.
 
 ## Requirements
 
@@ -230,13 +235,13 @@ Three things to keep in mind:
 | `getChannelById(id)` | `yt.channels.get(id)` | 1 unit |
 | `getLastVideoByUsername(username)` | `yt.channels.latestVideo(username)` | 2 units, plus the lookup of the name the first time |
 | `getLastVideoByChannelId(id)` | `yt.channels.latestVideo(id)` | 2 units |
-| `result.ok === false` | A thrown `YouTubeApiError` | |
+| `result.ok === false` | A thrown error: a `YouTubeApiError` when the API answered with an error status | |
 | `result.status`, `result.statusText` | `error.status`, `error.message` | |
 | `result.data` | The resolved value | |
 
 ## See also
 
-- [Quick start](/start/quick-start/): the rest of what version 2 does, in five minutes.
+- [Quick start](/start/quick-start/): the first calls of version 2.
 - [Channels](/resources/channels/): every channel helper.
 - [Errors](/basics/errors/): what is thrown and what is retried.
 - [Quota](/basics/quota/): what calls cost.

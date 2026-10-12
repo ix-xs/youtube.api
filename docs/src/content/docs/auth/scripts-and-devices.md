@@ -17,7 +17,10 @@ const oauth = new OAuth2({
   onTokens: store.save,
 });
 
-if (!oauth.canRefresh) await authorize(oauth, { scopes: ["youtube.readonly"] }); // opens the browser
+if (!oauth.canRefresh) {
+  // Opens the browser.
+  await authorize(oauth, { scopes: ["youtube.readonly"] });
+}
 
 const yt = new YouTube({ oauth });
 ```
@@ -30,7 +33,7 @@ The first run opens the consent page and writes `tokens.json`. Every later run r
 
 `authorize()` runs the whole [OAuth flow](/auth/oauth/) locally, so a script needs no web server and no callback route.
 
-Create an OAuth client of type **Desktop app** in the Google Cloud console. That type accepts any loopback redirect, which is what makes a free local port usable. [Credentials](/start/credentials/) shows where.
+Create an OAuth client of type **Desktop app** in the Google Cloud console. That type accepts any loopback redirect port, which is what makes a free local port usable. [Credentials](/start/credentials/) shows where.
 
 ```ts
 const tokens = await authorize(oauth, { scopes: ["youtube.upload"] });
@@ -55,12 +58,13 @@ await authorize(oauth, {
   scopes: ["youtube.readonly"],
   port: 8085, // listen here instead of a free port
   open: false, // do not launch the browser
-  onUrl: (url) => console.log(`Sign in at ${url}`), // replaces the default message
+  // Replaces the default message.
+  onUrl: (url) => console.log(`Sign in at ${url}`),
   timeout: "2m", // give up after two minutes, default "5m"
 });
 ```
 
-With a fixed `port` the redirect URI is `http://127.0.0.1:8085`. If the port is taken, the call rejects with Node's own listen error.
+`onUrl` is called whether or not the browser is opened. With a fixed `port` the redirect URI is `http://127.0.0.1:8085`. If the port is taken, the call rejects with Node's own listen error.
 
 ### When it fails
 
@@ -68,6 +72,8 @@ With a fixed `port` the redirect URI is `http://127.0.0.1:8085`. If the port is 
 
 - Nobody completed the consent screen before `timeout`.
 - The user refused, or Google returned another error. `error.oauthError` then holds the name Google gave.
+
+The exchange that ends the flow can fail too, the way [`exchange()`](/auth/oauth/) does.
 
 ```ts
 try {
@@ -88,7 +94,7 @@ try {
 ```ts
 const store = tokenFile("./secrets/tokens.json");
 
-const saved = await store.load(); // Tokens, or undefined when the file does not exist
+const saved = await store.load(); // Tokens, or undefined without a file
 await store.save({ refreshToken: "1//example" });
 ```
 
@@ -97,7 +103,7 @@ await store.save({ refreshToken: "1//example" });
 
 On Linux and macOS the file is readable by the current user only. Windows ignores that setting, so the permissions of the folder apply there. Put the file somewhere other accounts cannot read, and keep it out of version control.
 
-Since `save` is wired to `onTokens`, the file is rewritten after every refresh. If the write fails, the API call that triggered the refresh fails too: see [Storing tokens](/auth/oauth/#storing-tokens).
+Since `save` is wired to `onTokens`, the file is rewritten after every refresh. If the write fails, the API call that triggered the refresh fails too: see [Storing tokens](/auth/oauth/#storing-tokens). After `oauth.revoke()` the file holds an empty object.
 
 ## A complete script
 
@@ -117,7 +123,8 @@ const oauth = new OAuth2({
   onTokens: store.save,
 });
 
-// Consent is needed the first time, and again when the script asks for a scope the file does not have.
+// Consent is needed the first time, and again when the script asks for
+// a scope the file does not have.
 if (!oauth.canRefresh || !oauth.grantedScopes?.has(SCOPE)) {
   await authorize(oauth, { scopes: [SCOPE] });
 }
@@ -127,7 +134,12 @@ const yt = new YouTube({ oauth });
 const me = await yt.channels.mine();
 console.log(me?.snippet.title, me?.statistics.subscriberCount);
 
-for await (const playlist of yt.playlists.list({ part: ["snippet", "contentDetails"], mine: true })) {
+const playlists = yt.playlists.list({
+  part: ["snippet", "contentDetails"],
+  mine: true,
+});
+
+for await (const playlist of playlists) {
   console.log(playlist.snippet.title, playlist.contentDetails.itemCount);
 }
 ```
@@ -153,10 +165,17 @@ import { OAuth2, YouTube } from "@ix-xs/youtube.api";
 import { tokenFile } from "@ix-xs/youtube.api/node";
 
 const store = tokenFile("./tokens.json");
-const oauth = new OAuth2({ clientId, clientSecret, tokens: await store.load(), onTokens: store.save });
+const oauth = new OAuth2({
+  clientId,
+  clientSecret,
+  tokens: await store.load(),
+  onTokens: store.save,
+});
 
 if (!oauth.canRefresh) {
-  const device = await oauth.requestDeviceCode({ scopes: ["youtube.readonly"] });
+  const device = await oauth.requestDeviceCode({
+    scopes: ["youtube.readonly"],
+  });
   console.log(`Open ${device.verificationUrl} and enter ${device.userCode}`);
 
   await oauth.pollDeviceToken(device); // resolves once the user approved
@@ -169,15 +188,21 @@ const yt = new YouTube({ oauth });
 
 If the codes expire first, `pollDeviceToken()` throws a `YouTubeAuthError` whose `oauthError` is `expired_token`. Request a new code and show it again. Any other refusal is thrown as a `YouTubeAuthError` with the name Google gave.
 
-To stop waiting earlier, pass a `signal`. The promise then rejects with the reason of the signal:
+To stop waiting earlier, pass a `signal`. When it aborts, the promise rejects with a `YouTubeRequestError` whose code is `ABORTED`:
 
 ```ts
 const device = await oauth.requestDeviceCode({ scopes: ["youtube.readonly"] });
-await oauth.pollDeviceToken(device, { signal: AbortSignal.timeout(120_000) });
+
+try {
+  await oauth.pollDeviceToken(device, { signal: AbortSignal.timeout(120_000) });
+} catch (error) {
+  if (!isYouTubeError(error, "ABORTED")) throw error;
+  console.log("Nobody approved the device within two minutes.");
+}
 ```
 
 :::caution
-Google limits which scopes the device flow accepts. `youtube` and `youtube.readonly` are allowed. Before relying on another one, check [Google's list of scopes allowed for devices](https://developers.google.com/identity/protocols/oauth2/limited-input-device#allowedscopes).
+Google limits which scopes the device flow accepts. Before relying on one, check [Google's list of scopes allowed for devices](https://developers.google.com/identity/protocols/oauth2/limited-input-device#allowedscopes).
 :::
 
 ## Running on a server
@@ -192,7 +217,12 @@ A cron job or a worker has nobody to click through a consent screen. Do the cons
 
 ```ts
 const store = tokenFile("/var/lib/my-app/tokens.json");
-const oauth = new OAuth2({ clientId, clientSecret, tokens: await store.load(), onTokens: store.save });
+const oauth = new OAuth2({
+  clientId,
+  clientSecret,
+  tokens: await store.load(),
+  onTokens: store.save,
+});
 ```
 
 **Pass the refresh token only.** This suits a read-only filesystem or a platform that injects secrets as environment variables. Copy the `refreshToken` value out of `tokens.json`:
@@ -209,7 +239,7 @@ const yt = new YouTube({ oauth });
 
 The first call fetches an access token, and later ones renew it in memory. Nothing has to be written back: the library keeps the refresh token it was given.
 
-If a refresh ever fails with `oauthError: "invalid_grant"`, the refresh token is no longer valid: it was revoked or it expired. Repeat step 1.
+If a refresh ever fails with `oauthError: "invalid_grant"`, the refresh token is no longer valid: it was revoked or it expired. Repeat step 1. While the app is in the "Testing" status, its refresh tokens expire after 7 days: see [Credentials](/start/credentials/).
 
 ## Reference
 
@@ -244,7 +274,7 @@ Returns `Promise<Tokens>`.
 | `userCode` | Code the user types on the verification page |
 | `verificationUrl` | Page the user opens on another device |
 | `expiresIn` | Seconds until the codes expire |
-| `interval` | Seconds to wait between two polls |
+| `interval` | Seconds to wait between two polls. 5 when Google gives none |
 | `deviceCode` | Code `pollDeviceToken()` sends to Google while it waits |
 
 ## See also

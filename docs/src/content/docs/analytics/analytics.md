@@ -15,7 +15,8 @@ const report = await yt.analytics.query({
 });
 
 for (const row of report.rows) {
-  console.log(row.day, row.views, row.estimatedMinutesWatched, row.subscribersGained);
+  console.log(row.day, row.views, row.estimatedMinutesWatched);
+  console.log(row.subscribersGained);
 }
 ```
 
@@ -38,7 +39,7 @@ const totals = await yt.analytics.query({
 console.log(totals.rows[0]?.views);
 ```
 
-Analytics needs OAuth: the data is private to the channel. See [Scopes](#scopes). Calls are not billed in quota units: see [Quota](#quota).
+Analytics needs OAuth: see [Scopes](#scopes). Calls are not billed in quota units: see [Quota](#quota).
 
 ## Reading the result
 
@@ -67,22 +68,31 @@ The row type follows `metrics` and `dimensions`, the same way a resource type fo
 | On the report | Content |
 | --- | --- |
 | `rows` | One object per row. Empty when there is no data for the query |
-| `columns` | `{ name, type, dataType }` per column, dimensions first, in the order of the request |
+| `columns` | `{ name, type, dataType }` per column, dimensions first, in the order of the request. `type` is `"DIMENSION"` or `"METRIC"` |
 | `raw` | The response as the API sent it, with rows as arrays |
 
 A report with the `day` dimension has no rows for the most recent days.
 
 ## Dates
 
-`startDate` and `endDate` are both included. Each is a `YYYY-MM-DD` string or a `Date`. Analytics days are in Pacific Time.
+`startDate` is the first day of the report and `endDate` the last. Each is a `YYYY-MM-DD` string or a `Date`. Analytics days are in Pacific Time.
 
 A `Date` is read on your own calendar: the year, month and day it shows in the local time zone of the process. It is not converted to UTC, so "today" stays today wherever you run.
 
 ```ts
 const today = new Date();
-const monthAgo = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+const monthAgo = new Date(
+  today.getFullYear(),
+  today.getMonth() - 1,
+  today.getDate(),
+);
 
-const lastMonth = await yt.analytics.query({ startDate: monthAgo, endDate: today, metrics: "views", dimensions: "day" });
+const lastMonth = await yt.analytics.query({
+  startDate: monthAgo,
+  endDate: today,
+  metrics: "views",
+  dimensions: "day",
+});
 ```
 
 A string in another format, or an invalid `Date`, throws a `YouTubeArgumentError` before anything is sent.
@@ -104,7 +114,18 @@ const report = await yt.analytics.query({
 
 The API's own syntax works too: `filters: "video==dQw4w9WgXcQ;country==FR"`.
 
-`sort` takes one column or a list. Prefix a name with `-` for descending order: `sort: ["-views", "day"]`. Sort by columns that are in `metrics` or `dimensions`.
+`sort` takes one column or a list. Prefix a name with `-` for descending order: `sort: ["-views", "day"]`. It only accepts the metrics and dimensions of the query. Any other name is a compile error:
+
+```ts
+await yt.analytics.query({
+  startDate: "2026-01-01",
+  endDate: "2026-01-31",
+  metrics: "views",
+  dimensions: "day",
+  // @ts-expect-error likes is not a column of this query
+  sort: "-likes",
+});
+```
 
 `maxResults` caps the number of rows, and `startIndex` is the 1-based index of the first row, to page through a long report.
 
@@ -145,7 +166,9 @@ const videos = await yt.videos.getMany(
 );
 const titles = new Map(videos.map((video) => [video.id, video.snippet.title]));
 
-for (const row of top.rows) console.log(row.views, titles.get(row.video) ?? row.video);
+for (const row of top.rows) {
+  console.log(row.views, titles.get(row.video) ?? row.video);
+}
 ```
 
 Some reports require `maxResults`. Top videos is one of them.
@@ -161,7 +184,9 @@ const sources = await yt.analytics.query({
   sort: "-views",
 });
 
-for (const row of sources.rows) console.log(row.insightTrafficSourceType, row.views);
+for (const row of sources.rows) {
+  console.log(row.insightTrafficSourceType, row.views);
+}
 ```
 
 ### Audience by country
@@ -176,7 +201,10 @@ const countries = await yt.analytics.query({
   maxResults: 25,
 });
 
-for (const row of countries.rows) console.log(row.country, row.views, `${Math.round(row.averageViewDuration)} s`);
+for (const row of countries.rows) {
+  const seconds = Math.round(row.averageViewDuration);
+  console.log(row.country, row.views, `${seconds} s`);
+}
 ```
 
 ### Revenue
@@ -198,7 +226,7 @@ console.log(`${earned.toFixed(2)} EUR`);
 
 ## Not every combination exists
 
-Not every combination of metrics and dimensions exists. The API answers 400 for one it does not support. The valid ones are listed in YouTube's [channel reports reference](https://developers.google.com/youtube/analytics/channel_reports).
+The API answers 400 for a combination of metrics and dimensions it does not support. The valid ones are listed in YouTube's [channel reports reference](https://developers.google.com/youtube/analytics/channel_reports).
 
 ```ts
 try {
@@ -209,8 +237,8 @@ try {
     dimensions: ["ageGroup", "gender", "insightTrafficSourceType"],
   });
 } catch (error) {
-  if (error instanceof YouTubeApiError && error.status === 400) console.error("No such report:", error.message);
-  else throw error;
+  if (!(error instanceof YouTubeApiError) || error.status !== 400) throw error;
+  console.error("No such report:", error.message);
 }
 ```
 
@@ -221,10 +249,17 @@ The names are typed, so your editor completes the documented metrics and dimensi
 `ids` says whose data to report on. It defaults to `"channel==MINE"`, the channel of the authenticated user.
 
 ```ts
-await yt.analytics.query({ ids: `channel==${channelId}`, startDate: "2026-01-01", endDate: "2026-01-31", metrics: "views" });
+await yt.analytics.query({
+  ids: `channel==${channelId}`,
+  startDate: "2026-01-01",
+  endDate: "2026-01-31",
+  metrics: "views",
+});
 ```
 
 Content owners use `"contentOwner==NAME"`, with the name of the owner in YouTube's CMS. `includeHistoricalChannelData: true` adds the data from before a channel was linked to the owner.
+
+The `onBehalfOfContentOwner` option of the client is not sent with `query`: a query names the owner in `ids`. The group methods below do take `onBehalfOfContentOwner`, per call or from the client option. [Configuration](/basics/configuration/) describes that option.
 
 ## Groups
 
@@ -232,11 +267,19 @@ A group is a custom collection of up to 500 videos, playlists, channels or asset
 
 ```ts
 const group = await yt.analytics.groups.insert({
-  body: { snippet: { title: "Tutorials" }, contentDetails: { itemType: "youtube#video" } },
+  body: {
+    snippet: { title: "Tutorials" },
+    contentDetails: { itemType: "youtube#video" },
+  },
 });
 
 if (group.id) {
-  await yt.analytics.groupItems.insert({ body: { groupId: group.id, resource: { kind: "youtube#video", id: videoId } } });
+  await yt.analytics.groupItems.insert({
+    body: {
+      groupId: group.id,
+      resource: { kind: "youtube#video", id: videoId },
+    },
+  });
 
   const report = await yt.analytics.query({
     startDate: "2026-01-01",
@@ -252,12 +295,17 @@ if (group.id) {
 
 ```ts
 const { items } = await yt.analytics.groups.list({ mine: true });
-for (const group of items) console.log(group.id, group.snippet?.title, group.contentDetails?.itemCount);
+for (const group of items) {
+  console.log(group.id, group.snippet?.title);
+  console.log(group.contentDetails?.itemCount); // a string
+}
 
 const content = await yt.analytics.groupItems.list({ groupId });
 for (const item of content.items) console.log(item.id, item.resource?.id);
 
-await yt.analytics.groups.update({ body: { id: groupId, snippet: { title: "Tutorials 2026" } } });
+await yt.analytics.groups.update({
+  body: { id: groupId, snippet: { title: "Tutorials 2026" } },
+});
 await yt.analytics.groups.delete({ id: groupId });
 ```
 
@@ -274,12 +322,14 @@ await yt.analytics.groups.delete({ id: groupId });
 | `metrics` | one name or a list | What to measure. Required |
 | `dimensions` | one name or a list | How to split the numbers. Without it, one row of totals |
 | `filters` | object or string | Restricts the data |
-| `sort` | one name or a list | Columns to sort by, `-` for descending |
+| `sort` | one name or a list | Columns to sort by, among the metrics and dimensions of the query. `-` for descending |
 | `maxResults` | `number` | Rows to return at most. Some reports require it |
 | `startIndex` | `number` | 1-based index of the first row |
 | `currency` | `string` | Currency of revenue metrics, ISO 4217. Default `USD` |
 | `ids` | `string` | `"channel==MINE"` by default, `channel==ID` or `contentOwner==NAME` |
 | `includeHistoricalChannelData` | `boolean` | For content owners: include data from before the channel was linked |
+
+`options` are the [options of one call](/basics/configuration/).
 
 ### Groups
 
@@ -311,9 +361,9 @@ await yt.analytics.groups.delete({ id: groupId });
 | `yt-analytics.readonly` | YouTube Analytics reports |
 | `yt-analytics-monetary.readonly` | Monetary reports: the revenue metrics |
 
-Ask for them when you build the consent URL: see [OAuth](/auth/oauth/) and [Scopes](/auth/scopes/).
+Ask for them when you build the consent URL: see [OAuth](/auth/oauth/) and [Scopes](/auth/scopes/). The Analytics methods also accept `youtube`, `youtube.readonly` and `youtubepartner`.
 
-With an API key only, every Analytics call throws a `YouTubeAuthError` with the code `MISSING_CREDENTIALS` before anything is sent. With a token that lacks the scope, it throws `INSUFFICIENT_SCOPE`.
+With an API key only, every Analytics call throws a `YouTubeAuthError` with the code `MISSING_CREDENTIALS` before anything is sent. When the client knows the scopes of the token and none of them is accepted, the call throws `INSUFFICIENT_SCOPE`.
 
 ### Quota
 
@@ -334,7 +384,7 @@ yt.quota.used; // unchanged: this is the Data API bucket
 | A date that is not `YYYY-MM-DD`, or an invalid `Date` | `YouTubeArgumentError`, nothing sent |
 | An API key and no OAuth | `YouTubeAuthError`, code `MISSING_CREDENTIALS`, nothing sent |
 
-Read `error.message` on a 400: it is the API's own explanation of what the report does not accept.
+Read `error.message` on a 400: it is the message the API sent back.
 
 ## See also
 

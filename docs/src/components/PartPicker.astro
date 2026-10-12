@@ -8,6 +8,9 @@
 import real from "../data/parts.json";
 import worst from "../data/parts.worst.json";
 import { callHtml } from "./part-code";
+import { useT } from "../i18n";
+
+const t = useT(Astro.locals.starlightRoute.locale);
 
 // Development only: PICKER_DATA=worst builds the playground with the longest
 // names and types the API has, and PICKER_TICK=all|none sets what is ticked.
@@ -24,12 +27,12 @@ const INITIAL: Record<string, string[]> = {
 };
 /** Why a part can be missing although it was requested. */
 const WHY_OPTIONAL: Record<string, string> = {
-  liveStreamingDetails: "Only live videos have it, so it stays optional even when requested.",
+  liveStreamingDetails: t("picker.live"),
 };
 ---
 
 <part-picker class="pp">
-  <div class="pp-tabs" role="tablist" aria-label="Resource">
+  <div class="pp-tabs" role="tablist" aria-label={t("picker.resource")}>
     {resources.map((resource, index) => (
       <button class="pp-tab at-press" type="button" role="tab" id={`pp-tab-${resource.name}`} aria-controls={`pp-panel-${resource.name}`} aria-selected={index === 0 ? "true" : "false"} tabindex={index === 0 ? 0 : -1}>
         {resource.name}
@@ -41,9 +44,9 @@ const WHY_OPTIONAL: Record<string, string> = {
     const all = resource.parts.map((part) => part.name);
     const initial = tick === "all" ? all : tick === "none" ? [] : (INITIAL[resource.name] ?? all.slice(0, 1));
     return (
-      <div class="pp-panel" role="tabpanel" id={`pp-panel-${resource.name}`} aria-labelledby={`pp-tab-${resource.name}`} hidden={index !== 0} data-call={resource.call} data-id={resource.id} data-variable={resource.variable}>
+      <div class="pp-panel" role="tabpanel" id={`pp-panel-${resource.name}`} aria-labelledby={`pp-tab-${resource.name}`} hidden={index !== 0} data-call={resource.call} data-id={resource.id} data-variable={resource.variable} data-refused={t("picker.refused")}>
         <fieldset class="pp-parts">
-          <legend>Parts to request</legend>
+          <legend>{t("picker.parts")}</legend>
           {resource.parts.map((part) => (
             <label class="pp-chip at-press">
               <input type="checkbox" value={part.name} checked={initial.includes(part.name)} />
@@ -53,13 +56,13 @@ const WHY_OPTIONAL: Record<string, string> = {
         </fieldset>
 
         <div class="pp-panes">
-          <section class="pp-pane" aria-label="The call you write">
-            <h3>You write</h3>
-            <pre tabindex="0"><code data-pp-code set:html={callHtml(resource, initial)} /></pre>
+          <section class="pp-pane" aria-label={t("picker.writeLabel")}>
+            <h3>{t("picker.write")}</h3>
+            <pre tabindex="0"><code data-pp-code set:html={callHtml({ ...resource, refused: t("picker.refused") }, initial)} /></pre>
           </section>
 
-          <section class="pp-pane" aria-label="What the result lets you read" aria-live="polite">
-            <h3>You can read</h3>
+          <section class="pp-pane" aria-label={t("picker.readLabel")} aria-live="polite">
+            <h3>{t("picker.read")}</h3>
             <ul class="pp-type">
               <li class="pp-part" data-on>
                 <div class="pp-row"><code>{resource.variable}.id</code><span class="pp-t">string</span></div>
@@ -69,7 +72,7 @@ const WHY_OPTIONAL: Record<string, string> = {
                   <div class="pp-row">
                     <code>{resource.variable}.{part.name}{part.always ? "" : "?"}</code>
                     <span class="pp-t">{part.type}</span>
-                    <span class="pp-off">not requested: does not compile</span>
+                    <span class="pp-off">{t("picker.off")}</span>
                   </div>
                   <ul class="pp-fields">
                     {part.fields.map((field) => (
@@ -87,8 +90,8 @@ const WHY_OPTIONAL: Record<string, string> = {
         </div>
 
         <p class="pp-foot">
-          <span>Quota: <strong>1 unit</strong> per call, whatever the parts.</span>
-          <span class="pp-warn" data-pp-empty hidden>Pick at least one part.</span>
+          <span set:html={t("picker.quota")} />
+          <span class="pp-warn" data-pp-empty hidden>{t("picker.empty")}</span>
         </p>
       </div>
     );
@@ -156,7 +159,7 @@ const WHY_OPTIONAL: Record<string, string> = {
         const boxes = [...panel.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
         const code = panel.querySelector<HTMLElement>("[data-pp-code]")!;
         const empty = panel.querySelector<HTMLElement>("[data-pp-empty]")!;
-        const resource = { call: panel.dataset.call!, id: panel.dataset.id!, variable: panel.dataset.variable! };
+        const resource = { call: panel.dataset.call!, id: panel.dataset.id!, variable: panel.dataset.variable!, refused: panel.dataset.refused! };
 
         const render = () => {
           const parts = boxes.filter((box) => box.checked).map((box) => box.value);

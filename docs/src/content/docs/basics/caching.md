@@ -28,7 +28,7 @@ const yt = new YouTube({
 });
 ```
 
-A response is stored under the call that produced it: the method, every parameter, `fields`, and who asked. Change one parameter and it is another entry. Each page of a list is its own entry.
+A response is stored under the call that produced it: the request URL, which holds the method, every parameter, `fields` and `quotaUser`, and who asked. Change one parameter and it is another entry. Each page of a list is its own entry.
 
 A call answered from the cache costs no quota and does not touch the network. The `response` event reports it with `cached: true` and a cost of 0.
 
@@ -58,10 +58,13 @@ The `cache` request option overrides the policy for a single call.
 
 ```ts
 // Skip the cache: the call is sent, and its response is not stored.
-const live = await yt.videos.get(videoId, { cache: false });
+const live = await yt.videos.get(videoId, { cache: false }); // 1 unit
 
 // Keep the response of this call for an hour.
-const categories = await yt.videoCategories.list({ part: "snippet", regionCode: "FR" }, { cache: "1h" });
+const categories = await yt.videoCategories.list(
+  { part: "snippet", regionCode: "FR" },
+  { cache: "1h" },
+); // 1 unit
 ```
 
 A duration sets how long the response stored by this call stays fresh. It does not shorten an entry that is already there and still fresh. To force a new read, use `cache: false`.
@@ -75,7 +78,7 @@ Writes are never cached, and they do not remove anything from the cache. A read 
 ```ts
 await yt.playlists.add(playlistId, videoId); // 50 units
 
-// Read past the cache to see the new item.
+// Read past the cache to see the new item. 1 unit per page.
 const items = await yt.playlists.items(playlistId, { cache: false }).all();
 ```
 
@@ -89,7 +92,7 @@ await yt.clearCache();
 
 A stale entry is not thrown away. When a response carries an ETag, the client keeps it with the entry. Once the entry is stale, the next call sends that ETag in `If-None-Match`:
 
-- If nothing changed, the API answers `304 Not Modified` with no body. The entry is marked fresh for another `ttl` and its value is returned.
+- If nothing changed, the API answers `304 Not Modified` with no body. The entry is marked fresh again and its value is returned.
 - If something changed, the API answers with the new response, which replaces the entry.
 
 Revalidation saves the transfer, not the quota. `yt.quota` counts a `304` at the cost of the method. Only a fresh entry is free.
@@ -104,7 +107,7 @@ A cached response belongs to the credentials that fetched it.
 
 This holds for clients made with [`yt.as()`](/auth/many-users/), which share the cache of the client they come from.
 
-Two things follow from the digest. An `OAuth2` client with a refresh token is keyed on that token, so its entries survive each refresh; a bare `accessToken` is its own identity, and a new one starts with an empty cache. And in a runtime without the Web Crypto API, calls made with a token are not cached at all.
+Two things follow from the digest. An `OAuth2` client with a refresh token is keyed on that token, so its entries survive each refresh. A bare `accessToken` is its own identity, and a new one starts with an empty cache. And in a runtime without the Web Crypto API, calls made with a token are not cached at all.
 
 ## Identical reads share a request
 
@@ -112,10 +115,14 @@ When the same read is asked several times at the same moment, one request is sen
 
 ```ts
 // One request, 1 unit.
-const [a, b, c] = await Promise.all([yt.videos.get(videoId), yt.videos.get(videoId), yt.videos.get(videoId)]);
+const [a, b, c] = await Promise.all([
+  yt.videos.get(videoId),
+  yt.videos.get(videoId),
+  yt.videos.get(videoId),
+]);
 ```
 
-"The same read" means the same method, parameters and credentials. A call that carries a `signal` is never shared, so that aborting it cannot cancel someone else's request.
+"The same read" means the same URL and the same credentials. A call that carries a `signal` is never shared, so that aborting it cannot cancel someone else's request.
 
 ## What is never cached
 
@@ -123,11 +130,13 @@ const [a, b, c] = await Promise.all([yt.videos.get(videoId), yt.videos.get(video
 - Errors. A failed read is retried or thrown, never stored.
 - Live chat. `chat.messages()` reads past the cache, because a cached page would replay old messages as new ones.
 - The upload watcher. When `yt.watch()` falls back on the API, it reads past the cache too.
-- Uploads and downloads of media.
+- Media uploads, report downloads with `yt.reporting.download()`, and the live chat stream.
+
+`yt.captions.download()` is a read like any other: its text is cached. Pass `cache: false` when you need the current track.
 
 ## A custom store
 
-The built-in store lives in the memory of one process. To share the cache between processes, or to keep it across restarts, give the client a `CacheStore`. It has three methods, `get`, `set` and `delete`, and an optional `clear`. Each can be synchronous or return a promise.
+The built-in store lives in the memory of one process. To share the cache between processes, or to keep it across restarts, give the client a `CacheStore`. It needs two methods, `get` and `set`. `delete` and `clear` are optional. Each can be synchronous or return a promise.
 
 A store backed by a `Map`:
 
@@ -181,6 +190,7 @@ What to know when you write one:
 
 - An entry is `{ value, etag, expires }`. `value` is the parsed response body, so it serialises as JSON. `expires` is a timestamp in milliseconds.
 - The client decides whether an entry is fresh. Return entries past their `expires`: a stale entry with an ETag is what makes revalidation possible. Evict on your own terms, by count or by a longer delay.
+- The client calls `get`, `set` and, from `yt.clearCache()`, `clear`. It never calls `delete`: write one for your own invalidation, or leave it out.
 - `max` only applies to the built-in store. With your own store, bounding the size is your job.
 - Without `clear`, `yt.clearCache()` does nothing.
 
@@ -222,7 +232,7 @@ yt.on("error", (error) => {
 | --- | --- |
 | `get` | `(key: string) => CacheEntry \| undefined \| Promise<CacheEntry \| undefined>` |
 | `set` | `(key: string, entry: CacheEntry) => void \| Promise<void>` |
-| `delete` | `(key: string) => void \| Promise<void>` |
+| `delete` | `(key: string) => void \| Promise<void>`, optional |
 | `clear` | Optional. `() => void \| Promise<void>` |
 
 ### `CacheEntry`

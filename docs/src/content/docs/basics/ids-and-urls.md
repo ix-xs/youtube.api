@@ -6,24 +6,34 @@ sidebar:
 ---
 
 ```ts
-import { formatDuration, parseUrl, urls, videoIdFrom } from "@ix-xs/youtube.api";
+import {
+  formatDuration,
+  parseUrl,
+  urls,
+  videoIdFrom,
+} from "@ix-xs/youtube.api";
 
 parseUrl("https://youtu.be/dQw4w9WgXcQ?t=42");
 // { type: "video", videoId: "dQw4w9WgXcQ", format: "watch", start: 42 }
 
 videoIdFrom("https://www.youtube.com/shorts/dQw4w9WgXcQ"); // "dQw4w9WgXcQ"
-urls.video("dQw4w9WgXcQ", { start: 42 }); // "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s"
+
+urls.video("dQw4w9WgXcQ", { start: 42 });
+// "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s"
+
 formatDuration("PT1H2M3S"); // "1:02:03"
 ```
 
 ## When you need them
 
-Often you do not. The helpers of the client take an id or a URL and sort it out themselves:
+Often you do not. The helpers of the client take an id or a URL and sort it out themselves. Each of these calls costs 1 unit:
 
 ```ts
-await yt.videos.get("https://youtu.be/dQw4w9WgXcQ"); // 1 unit
-await yt.playlists.items("https://www.youtube.com/playlist?list=PLBCF2DAC6FFB574DE"); // 1 unit
-await yt.channels.get("https://www.youtube.com/@GoogleDevelopers"); // 1 unit
+await yt.videos.get("https://youtu.be/dQw4w9WgXcQ");
+await yt.playlists.items(
+  "https://www.youtube.com/playlist?list=PLBCF2DAC6FFB574DE",
+);
+await yt.channels.get("https://www.youtube.com/@GoogleDevelopers");
 ```
 
 The functions on this page are for your own code: validating what a user pasted, routing a link to the right handler, storing a clean id, or building a link to show. They are plain functions. They work without a client and without credentials.
@@ -38,12 +48,16 @@ function describe(input: string): string {
   if (!link) return "Not a YouTube link";
 
   switch (link.type) {
-    case "video":
-      return `Video ${link.videoId}${link.start ? `, from ${link.start} s` : ""}`;
+    case "video": {
+      const from = link.start ? `, from ${link.start} s` : "";
+      return `Video ${link.videoId}${from}`;
+    }
     case "playlist":
       return `Playlist ${link.playlistId}`;
-    case "channel":
-      return `Channel ${link.channelId ?? link.handle ?? link.username ?? link.customUrl}`;
+    case "channel": {
+      const { channelId, handle, username, customUrl } = link;
+      return `Channel ${channelId ?? handle ?? username ?? customUrl}`;
+    }
   }
 }
 ```
@@ -71,8 +85,16 @@ On a video link, two query parameters add a field:
 - `t` or `start` gives `start`, in seconds. `42`, `42s`, `1m30s` and `1h2m3s` are all read.
 
 ```ts
-parseUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLBCF2DAC6FFB574DE&t=1m30s");
-// { type: "video", videoId: "dQw4w9WgXcQ", format: "watch", playlistId: "PLBCF2DAC6FFB574DE", start: 90 }
+parseUrl(
+  "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLBCF2DAC6FFB574DE&t=1m30s",
+);
+// {
+//   type: "video",
+//   videoId: "dQw4w9WgXcQ",
+//   format: "watch",
+//   playlistId: "PLBCF2DAC6FFB574DE",
+//   start: 90,
+// }
 ```
 
 Accepted hosts are `youtube.com` and `youtube-nocookie.com`, bare or with `www.`, `m.`, `music.` or `gaming.` in front, and `youtu.be`. The scheme can be left out: `"youtube.com/@GoogleDevelopers"` works.
@@ -90,9 +112,11 @@ videoIdFrom("dQw4w9WgXcQ"); // "dQw4w9WgXcQ"
 videoIdFrom("https://www.youtube.com/shorts/abcdefghijk"); // "abcdefghijk"
 videoIdFrom("https://www.youtube.com/@GoogleDevelopers"); // null
 
+const watch = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+
 playlistIdFrom("PLBCF2DAC6FFB574DE"); // "PLBCF2DAC6FFB574DE"
-playlistIdFrom("https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLBCF2DAC6FFB574DE"); // "PLBCF2DAC6FFB574DE"
-playlistIdFrom("https://www.youtube.com/watch?v=dQw4w9WgXcQ"); // null
+playlistIdFrom(`${watch}&list=PLBCF2DAC6FFB574DE`); // "PLBCF2DAC6FFB574DE"
+playlistIdFrom(watch); // null
 ```
 
 A typical use is cleaning a form field before storing it:
@@ -110,17 +134,26 @@ function videoIdOrThrow(input: string): string {
 A channel can be designated in four ways. `parseChannelRef` works out which one a string is.
 
 ```ts
-parseChannelRef("UC_x5XG1OV2P6uZZ5FSM9Ttw"); // { by: "id", value: "UC_x5XG1OV2P6uZZ5FSM9Ttw" }
-parseChannelRef("@GoogleDevelopers"); // { by: "handle", value: "@GoogleDevelopers" }
-parseChannelRef("GoogleDevelopers"); // { by: "handle", value: "@GoogleDevelopers" }
-parseChannelRef("https://www.youtube.com/user/GoogleDevelopers"); // { by: "username", value: "GoogleDevelopers" }
-parseChannelRef("youtube.com/c/GoogleDevelopers"); // { by: "custom", value: "GoogleDevelopers" }
+parseChannelRef("UC_x5XG1OV2P6uZZ5FSM9Ttw");
+// { by: "id", value: "UC_x5XG1OV2P6uZZ5FSM9Ttw" }
+
+parseChannelRef("@GoogleDevelopers");
+// { by: "handle", value: "@GoogleDevelopers" }
+
+parseChannelRef("GoogleDevelopers");
+// { by: "handle", value: "@GoogleDevelopers" }
+
+parseChannelRef("https://www.youtube.com/user/GoogleDevelopers");
+// { by: "username", value: "GoogleDevelopers" }
+
+parseChannelRef("youtube.com/c/GoogleDevelopers");
+// { by: "custom", value: "GoogleDevelopers" }
 ```
 
 | `by` | Comes from | Looking it up |
 | --- | --- | --- |
 | `"id"` | A `UC...` id, or a `/channel/UC...` URL | Nothing to resolve |
-| `"handle"` | An `@handle`, a `/@handle` URL, or a bare name | `channels.list` with `forHandle`, 1 unit |
+| `"handle"` | An `@handle`, a `/@handle` URL, or a bare name | `channels.list` with `forHandle`, 1 unit. A bare name is then tried as a username, 1 more unit |
 | `"username"` | A `/user/name` URL | `channels.list` with `forUsername`, 1 unit |
 | `"custom"` | A `/c/name` or `/name` URL | No direct lookup. Tried as a handle, then as a username |
 
@@ -129,10 +162,11 @@ A bare name is read as a handle, because handles are by far the most common toda
 It does not call the API. To get the `UC...` id of any reference, use the client:
 
 ```ts
-const id = await yt.channels.resolveId("@GoogleDevelopers"); // "UC_x5XG1OV2P6uZZ5FSM9Ttw"
+const id = await yt.channels.resolveId("@GoogleDevelopers");
+// "UC_x5XG1OV2P6uZZ5FSM9Ttw"
 ```
 
-An id or a `/channel/` URL costs nothing. A handle or a username costs 1 unit the first time, and the client remembers the answer.
+An id or a `/channel/` URL costs nothing. A handle or a username costs 1 unit the first time, 2 for a bare name that turns out to be a legacy username, and the client remembers the answer.
 
 ## Checking an id
 
@@ -152,11 +186,14 @@ The checks are loose on purpose. Any 11 characters among letters, digits, `-` an
 
 ## The playlists of a channel
 
-Every channel has playlists that YouTube generates. Their ids are the channel id with another prefix, so `channelPlaylistId` derives them without any call.
+A channel has playlists that YouTube generates. Their ids are the channel id with another prefix, so `channelPlaylistId` derives them without any call.
 
 ```ts
-channelPlaylistId("UC_x5XG1OV2P6uZZ5FSM9Ttw"); // "UU_x5XG1OV2P6uZZ5FSM9Ttw"
-channelPlaylistId("UC_x5XG1OV2P6uZZ5FSM9Ttw", "shorts"); // "UUSH_x5XG1OV2P6uZZ5FSM9Ttw"
+channelPlaylistId("UC_x5XG1OV2P6uZZ5FSM9Ttw");
+// "UU_x5XG1OV2P6uZZ5FSM9Ttw"
+
+channelPlaylistId("UC_x5XG1OV2P6uZZ5FSM9Ttw", "shorts");
+// "UUSH_x5XG1OV2P6uZZ5FSM9Ttw"
 ```
 
 | Kind | Prefix | Holds | Documented by YouTube |
@@ -165,9 +202,9 @@ channelPlaylistId("UC_x5XG1OV2P6uZZ5FSM9Ttw", "shorts"); // "UUSH_x5XG1OV2P6uZZ5
 | `"videos"` | `UULF` | Uploads without Shorts and live streams | No |
 | `"shorts"` | `UUSH` | Shorts only | No |
 | `"live"` | `UULV` | Live streams only | No |
-| `"popularVideos"` | `UULP` | The popular regular videos | No |
-| `"popularShorts"` | `UUPS` | The popular Shorts | No |
-| `"popularLive"` | `UUPV` | The popular live streams | No |
+| `"popularVideos"` | `UULP` | The regular videos, sorted by views | No |
+| `"popularShorts"` | `UUPS` | The Shorts, sorted by views | No |
+| `"popularLive"` | `UUPV` | The live streams, sorted by views | No |
 | `"membersOnlyVideos"` | `UUMO` | The videos for members only | No |
 
 :::caution
@@ -181,25 +218,41 @@ const shortsId = channelPlaylistId(channelId, "shorts");
 const shorts = await yt.playlists.items(shortsId).take(50); // 1 unit
 
 // The same, from any channel reference:
-const sameShorts = await yt.channels.uploads("@GoogleDevelopers", { kind: "shorts" }).take(50);
+const sameShorts = await yt.channels
+  .uploads("@GoogleDevelopers", { kind: "shorts" })
+  .take(50);
 ```
 
-`channelPlaylistId` needs a real channel id and throws a `YouTubeArgumentError` for anything else. A channel that never uploaded has no uploads playlist: reading it fails with a `NOT_FOUND` error.
+`channelPlaylistId` checks the shape of the channel id and throws a `YouTubeArgumentError` for anything else. A channel that never uploaded has no uploads playlist: reading it fails with a `NOT_FOUND` error.
 
 ## Building URLs
 
 `urls` builds the links you show to people.
 
 ```ts
-urls.video("dQw4w9WgXcQ"); // "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-urls.video("dQw4w9WgXcQ", { start: 42 }); // "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s"
-urls.video("dQw4w9WgXcQ", { short: true, start: 42 }); // "https://youtu.be/dQw4w9WgXcQ?t=42s"
-urls.video("dQw4w9WgXcQ", { playlistId: "PLBCF2DAC6FFB574DE" }); // "...watch?v=dQw4w9WgXcQ&list=PLBCF2DAC6FFB574DE"
+urls.video("dQw4w9WgXcQ");
+// "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
-urls.short("dQw4w9WgXcQ"); // "https://www.youtube.com/shorts/dQw4w9WgXcQ"
-urls.channel("@GoogleDevelopers"); // "https://www.youtube.com/@GoogleDevelopers"
-urls.channel("UC_x5XG1OV2P6uZZ5FSM9Ttw"); // "https://www.youtube.com/channel/UC_x5XG1OV2P6uZZ5FSM9Ttw"
-urls.playlist("PLBCF2DAC6FFB574DE"); // "https://www.youtube.com/playlist?list=PLBCF2DAC6FFB574DE"
+urls.video("dQw4w9WgXcQ", { start: 42 });
+// "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s"
+
+urls.video("dQw4w9WgXcQ", { short: true, start: 42 });
+// "https://youtu.be/dQw4w9WgXcQ?t=42s"
+
+urls.video("dQw4w9WgXcQ", { playlistId: "PLBCF2DAC6FFB574DE" });
+// "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLBCF2DAC6FFB574DE"
+
+urls.short("dQw4w9WgXcQ");
+// "https://www.youtube.com/shorts/dQw4w9WgXcQ"
+
+urls.channel("@GoogleDevelopers");
+// "https://www.youtube.com/@GoogleDevelopers"
+
+urls.channel("UC_x5XG1OV2P6uZZ5FSM9Ttw");
+// "https://www.youtube.com/channel/UC_x5XG1OV2P6uZZ5FSM9Ttw"
+
+urls.playlist("PLBCF2DAC6FFB574DE");
+// "https://www.youtube.com/playlist?list=PLBCF2DAC6FFB574DE"
 ```
 
 `urls.embed` gives the `src` of an `<iframe>` player:
@@ -207,7 +260,12 @@ urls.playlist("PLBCF2DAC6FFB574DE"); // "https://www.youtube.com/playlist?list=P
 ```ts
 urls.embed("dQw4w9WgXcQ"); // "https://www.youtube.com/embed/dQw4w9WgXcQ"
 
-urls.embed("dQw4w9WgXcQ", { noCookie: true, start: 30, autoplay: true, mute: true });
+urls.embed("dQw4w9WgXcQ", {
+  noCookie: true,
+  start: 30,
+  autoplay: true,
+  mute: true,
+});
 // "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?start=30&autoplay=1&mute=1"
 ```
 
@@ -216,8 +274,11 @@ urls.embed("dQw4w9WgXcQ", { noCookie: true, start: 30, autoplay: true, mute: tru
 `urls.thumbnail` gives the address of a video's thumbnail without any API call:
 
 ```ts
-urls.thumbnail("dQw4w9WgXcQ"); // "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
-urls.thumbnail("dQw4w9WgXcQ", "maxres"); // "https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg"
+urls.thumbnail("dQw4w9WgXcQ");
+// "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+
+urls.thumbnail("dQw4w9WgXcQ", "maxres");
+// "https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg"
 ```
 
 The qualities are `"default"`, `"medium"`, `"high"` (the default), `"standard"` and `"maxres"`. `maxres` is missing on older or low-resolution uploads, and the URL is built without checking. When you already have the video, `bestThumbnail` below picks one that exists.
@@ -246,11 +307,12 @@ parseDuration("PT4M13S"); // 253
 parseDuration("PT1H2M3S"); // 3723
 parseDuration("P1DT2H"); // 93600
 parseDuration("P0D"); // 0
+parseDuration("253s"); // 253: the form videos.batchGetStats uses
 ```
 
-A live stream that has not ended reports `P0D`, which gives 0. A string that is not an ISO 8601 duration throws a `YouTubeArgumentError`.
+A live stream that has not ended reports `P0D`, which gives 0. A string in neither form throws a `YouTubeArgumentError`.
 
-`formatDuration` takes seconds or an ISO 8601 duration, and a style:
+`formatDuration` takes seconds or a string `parseDuration` reads, and a style:
 
 | Call | Result |
 | --- | --- |
@@ -277,13 +339,13 @@ formatCount("1234567", "de"); // "1,2 Mio."
 
 The second argument is a locale, or a list of locales. The default is `"en"`. The text comes from `Intl.NumberFormat`, so it depends on the locale data of the runtime. Some locales put a no-break space before the unit: compare such strings with care in tests.
 
-A value that is not a number throws a `YouTubeArgumentError`. Remember that some counts are optional: `likeCount` is absent when the owner hides it.
+A value that is not a number throws a `YouTubeArgumentError`. Some counts are optional, `likeCount` for one, so check before you format:
 
 ```ts
-const video = await yt.videos.get(videoId);
+const video = await yt.videos.get(videoId); // 1 unit
 const likes = video?.statistics.likeCount;
 
-console.log(likes === undefined ? "hidden" : formatCount(likes));
+console.log(likes === undefined ? "not available" : formatCount(likes));
 ```
 
 ### Thumbnails
@@ -291,6 +353,7 @@ console.log(likes === undefined ? "hidden" : formatCount(likes));
 `bestThumbnail` picks the largest image of a `snippet.thumbnails` object and returns it whole, with its `url`, `width` and `height`. It returns `undefined` when there is none, which happens for deleted or private videos in a playlist. It accepts `undefined` and `null`, so it chains.
 
 ```ts
+// 1 unit per page of 50 items.
 for await (const item of yt.playlists.items(playlistId)) {
   const image = bestThumbnail(item.snippet.thumbnails);
   console.log(item.snippet.title, image?.url ?? "(no thumbnail)");
@@ -302,7 +365,9 @@ for await (const item of yt.playlists.items(playlistId)) {
 `VideoCategories` names the ids of the video categories, so you do not write `"20"` for Gaming.
 
 ```ts
-const top = await yt.videos.popular({ regionCode: "FR", videoCategoryId: VideoCategories.Gaming }).take(10); // 1 unit
+const top = await yt.videos
+  .popular({ regionCode: "FR", videoCategoryId: VideoCategories.Gaming })
+  .take(10); // 1 unit
 ```
 
 | Name | Id | Name | Id |
@@ -328,7 +393,7 @@ The ids are the same in every region. Only their availability differs, which `yt
 | `parseChannelRef(input)` | `ChannelRef` | Tells an id, a handle, a username or a custom URL apart. Throws on anything else |
 | `isVideoId(value)` | `boolean` | 11 URL-safe characters |
 | `isChannelId(value)` | `boolean` | `UC` followed by 22 characters |
-| `isPlaylistId(value)` | `boolean` | Starts with a playlist prefix such as `PL` or `UU`, and is not shaped like a video id |
+| `isPlaylistId(value)` | `boolean` | A playlist prefix such as `PL` or `UU` and at least 10 more characters, or `WL` or `LL` alone. Never a string shaped like a video id |
 | `channelPlaylistId(channelId, kind?)` | `string` | The id of one of a channel's generated playlists |
 | `urls.video(videoId, options?)` | `string` | Watch page. Options: `start`, `playlistId`, `short` |
 | `urls.short(videoId)` | `string` | Shorts player |

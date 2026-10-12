@@ -10,7 +10,11 @@ import { fileMedia } from "@ix-xs/youtube.api/node";
 
 const video = await yt.videos.insert({
   body: {
-    snippet: { title: "Holiday 2026", description: "Uploaded from code", categoryId: "22" },
+    snippet: {
+      title: "Holiday 2026",
+      description: "Uploaded from code",
+      categoryId: "22",
+    },
     status: { privacyStatus: "private", selfDeclaredMadeForKids: false },
   },
   media: await fileMedia("./holiday.mp4", {
@@ -42,7 +46,8 @@ const video = await yt.videos.insert({
     },
     status: {
       privacyStatus: "private",
-      publishAt: "2026-12-01T15:00:00Z", // scheduled publication. Only valid on a private video
+      // Scheduled publication. Only valid on a private video.
+      publishAt: "2026-12-01T15:00:00Z",
       selfDeclaredMadeForKids: false,
     },
   },
@@ -66,7 +71,10 @@ Without `part`, the result has a known `id` and every part optional. With an exp
 ```ts
 const video = await yt.videos.insert({
   part: ["snippet", "status"],
-  body: { snippet: { title: "Holiday 2026" }, status: { privacyStatus: "private" } },
+  body: {
+    snippet: { title: "Holiday 2026" },
+    status: { privacyStatus: "private" },
+  },
   media: file,
 });
 
@@ -83,13 +91,16 @@ video.status.uploadStatus; // typed, because status was requested
 | A `Uint8Array` or an `ArrayBuffer` | Yes | `application/octet-stream` |
 | A `ReadableStream` or an async iterable of byte chunks | No | `application/octet-stream` |
 | A string | Yes | `text/plain; charset=UTF-8`. It is sent as UTF-8 text, which suits caption files |
-| `{ body, ...options }` | As its `body` | The `mimeType` option |
+| `{ body, ...options }` | As its `body` | As its `body` |
 
 The object form wraps any of the others and adds options:
 
 ```ts
 await yt.videos.insert({
-  body: { snippet: { title: "Holiday 2026" }, status: { privacyStatus: "private" } },
+  body: {
+    snippet: { title: "Holiday 2026" },
+    status: { privacyStatus: "private" },
+  },
   media: {
     body: file,
     mimeType: "video/mp4",
@@ -105,7 +116,10 @@ A stream is for bytes that are not on disk, such as a download you pass along. I
 const source = await fetch("https://example.com/exports/holiday.mp4");
 
 await yt.videos.insert({
-  body: { snippet: { title: "Holiday 2026" }, status: { privacyStatus: "private" } },
+  body: {
+    snippet: { title: "Holiday 2026" },
+    status: { privacyStatus: "private" },
+  },
   media: {
     body: source.body!,
     mimeType: "video/mp4",
@@ -124,7 +138,10 @@ await yt.videos.insert({
 import { fileMedia } from "@ix-xs/youtube.api/node";
 
 const media = await fileMedia("./holiday.mp4");
-const tuned = await fileMedia("./holiday.bin", { mimeType: "video/mp4", chunkSize: 32 * 1024 * 1024 });
+const tuned = await fileMedia("./holiday.bin", {
+  mimeType: "video/mp4",
+  chunkSize: 32 * 1024 * 1024,
+});
 ```
 
 The MIME type comes from the extension unless you pass `mimeType`:
@@ -140,7 +157,7 @@ It also takes `chunkSize`, `resumeUri` and `onProgress`, described below.
 
 ## What happens under the hood
 
-Before anything is sent, the media is checked against what the method accepts. A MIME type the method refuses, an empty body, or a known size above the limit throws a `YouTubeArgumentError`. No quota is spent.
+Before any byte is sent, the media is checked against what the method accepts. A MIME type the method refuses, or a known size that is zero or above the limit, throws a `YouTubeArgumentError`. No quota is spent. A stream has no known size, so the size checks do not apply to it: see [Errors](#errors).
 
 Then one of two things happens:
 
@@ -156,12 +173,17 @@ A larger chunk means fewer requests. A smaller one means finer progress and less
 `onProgress` is called when the session opens and after each confirmed chunk. A single-request upload calls it once, when it is done.
 
 ```ts
+const megabytes = (bytes: number) => (bytes / 1024 / 1024).toFixed(1);
+
 await yt.videos.insert({
-  body: { snippet: { title: "Holiday 2026" }, status: { privacyStatus: "private" } },
+  body: {
+    snippet: { title: "Holiday 2026" },
+    status: { privacyStatus: "private" },
+  },
   media: await fileMedia("./holiday.mp4", {
     onProgress: ({ uploaded, total, percent }) => {
-      const megabytes = (bytes: number) => (bytes / 1024 / 1024).toFixed(1);
-      process.stdout.write(`\r${megabytes(uploaded)} / ${megabytes(total ?? 0)} MiB (${percent ?? 0}%)`);
+      const done = `${megabytes(uploaded)} / ${megabytes(total ?? 0)} MiB`;
+      process.stdout.write(`\r${done} (${percent ?? 0}%)`);
     },
   }),
 });
@@ -170,7 +192,7 @@ await yt.videos.insert({
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `uploaded` | `number` | Bytes confirmed by the server |
-| `total` | `number \| undefined` | Total size in bytes, when known |
+| `total` | `number \| undefined` | Total size in bytes, when known. For a stream, the `size` you declared |
 | `percent` | `number \| undefined` | 0 to 100 with one decimal, when the total is known |
 | `sessionUri` | `string \| undefined` | The resumable session. `undefined` for a single-request upload |
 
@@ -199,7 +221,10 @@ const cancelButton = document.querySelector("button#cancel")!;
 cancelButton.addEventListener("click", () => controller.abort());
 
 try {
-  await yt.videos.insert({ body: { snippet: { title: "Holiday 2026" } }, media: file }, { signal: controller.signal });
+  await yt.videos.insert(
+    { body: { snippet: { title: "Holiday 2026" } }, media: file },
+    { signal: controller.signal },
+  );
 } catch (error) {
   if (!isYouTubeError(error, "ABORTED")) throw error;
   console.log("Upload cancelled");
@@ -212,7 +237,7 @@ An aborted upload throws a `YouTubeRequestError` with the code `ABORTED`.
 
 A resumable session outlives your process. It stays valid for about a week. Keep its URI, and a later run continues where the upload stopped instead of starting over.
 
-The URI is in every progress report. Store it as soon as it appears, pass it back as `resumeUri`:
+The URI is in every progress report of a resumable upload. Store it as soon as it appears, pass it back as `resumeUri`:
 
 ```ts
 import { fileMedia } from "@ix-xs/youtube.api/node";
@@ -220,11 +245,16 @@ import { fileMedia } from "@ix-xs/youtube.api/node";
 const saved: string | undefined = await db.uploads.get("holiday");
 
 const video = await yt.videos.insert({
-  body: { snippet: { title: "Holiday 2026" }, status: { privacyStatus: "private" } },
+  body: {
+    snippet: { title: "Holiday 2026" },
+    status: { privacyStatus: "private" },
+  },
   media: await fileMedia("./holiday.mp4", {
     resumeUri: saved,
     onProgress: ({ sessionUri }) => {
-      if (sessionUri && sessionUri !== saved) void db.uploads.set("holiday", sessionUri);
+      if (sessionUri && sessionUri !== saved) {
+        void db.uploads.set("holiday", sessionUri);
+      }
     },
   }),
 });
@@ -234,13 +264,16 @@ await db.uploads.delete("holiday");
 
 With a `resumeUri`, the client first asks the server how far the upload went, skips that many bytes of the media, and sends the rest. If the server already has everything, the call returns the video at once. Pass the same file: the bytes are not compared.
 
-The metadata was sent when the session was opened. On a resume, `body` is still required by the type but is not sent again.
+The metadata and the parameters were sent when the session was opened. On a resume, `body` is still required by the type, but neither it nor the parameters are sent again.
 
 The URI is also on the error when a session gives up, along with the number of confirmed bytes:
 
 ```ts
 try {
-  await yt.videos.insert({ body: { snippet: { title: "Holiday 2026" } }, media: await fileMedia("./holiday.mp4") });
+  await yt.videos.insert({
+    body: { snippet: { title: "Holiday 2026" } },
+    media: await fileMedia("./holiday.mp4"),
+  });
 } catch (error) {
   if (error instanceof YouTubeUploadError && error.sessionUri) {
     console.log(`Stopped after ${error.uploaded} bytes`);
@@ -251,7 +284,7 @@ try {
 }
 ```
 
-A session that has expired cannot be resumed. The call then throws a `YouTubeUploadError` whose message says so. Drop the stored URI and upload again without `resumeUri`.
+A session that has expired cannot be resumed. The call then throws a `YouTubeUploadError` whose `sessionUri` is `undefined`, since there is nothing left to resume. Drop the stored URI and upload again without `resumeUri`.
 
 Resuming works best with a file or a `Blob`, where skipping is free. A stream can only be resumed if you can produce it again from its first byte: the client reads and discards what the server already has.
 
@@ -315,7 +348,10 @@ if (channel && url) {
   await yt.channels.update({
     body: {
       id: channel.id,
-      brandingSettings: { ...branding, image: { ...branding.image, bannerExternalUrl: url } },
+      brandingSettings: {
+        ...branding,
+        image: { ...branding.image, bannerExternalUrl: url },
+      },
     },
   });
 }
@@ -342,9 +378,14 @@ await yt.playlistImages.update({
 `media` is optional on `update`. Reading and removing the image are plain calls:
 
 ```ts
-const { items } = await yt.playlistImages.list({ part: "snippet", parent: playlistId }); // 1 unit
+// 1 unit.
+const { items } = await yt.playlistImages.list({
+  part: "snippet",
+  parent: playlistId,
+});
 
-for (const item of items) await yt.playlistImages.delete({ id: item.id }); // 50 units each
+// 50 units each.
+for (const item of items) await yt.playlistImages.delete({ id: item.id });
 ```
 
 ## Setting a watermark
@@ -379,7 +420,10 @@ input.addEventListener("change", async () => {
   if (!picked) return;
 
   const video = await yt.videos.insert({
-    body: { snippet: { title: picked.name }, status: { privacyStatus: "private" } },
+    body: {
+      snippet: { title: picked.name },
+      status: { privacyStatus: "private" },
+    },
     media: {
       body: picked,
       onProgress: ({ percent }) => {
@@ -398,16 +442,22 @@ The bytes go from the browser to YouTube, in chunks read from the file as needed
 
 ```ts
 try {
-  await yt.videos.insert({ body: { snippet: { title: "Holiday 2026" } }, media: file });
+  await yt.videos.insert({
+    body: { snippet: { title: "Holiday 2026" } },
+    media: file,
+  });
 } catch (error) {
   if (error instanceof YouTubeArgumentError) {
-    // Refused before sending: wrong MIME type, empty or oversized media.
+    // Refused by the client: wrong MIME type, empty or oversized media.
   } else if (error instanceof YouTubeUploadError) {
     // The transfer gave up. error.sessionUri may allow a resume.
-  } else if (error instanceof YouTubeApiError && error.reason === "uploadLimitExceeded") {
-    // YouTube refuses more uploads from this channel for now.
+  } else if (
+    error instanceof YouTubeApiError &&
+    error.reason === "uploadLimitExceeded"
+  ) {
+    // The API refused the upload: the upload limit is reached.
   } else if (isYouTubeError(error, "QUOTA_EXCEEDED")) {
-    // The videos.insert bucket of the project is empty until yt.quota.resetsAt.
+    // The project used its uploads for the day. See yt.quota.resetsAt.
   } else {
     throw error;
   }
@@ -416,8 +466,8 @@ try {
 
 | Error | Code | When |
 | --- | --- | --- |
-| `YouTubeArgumentError` | `INVALID_ARGUMENT` | The MIME type is not accepted, the media is empty, a known size is over the limit, or the body is not a supported form. Nothing was sent |
-| `YouTubeUploadError` | `UPLOAD_FAILED` | The transfer failed: no session could be opened, too many failures in a row, or the session expired. Carries `sessionUri` and `uploaded` |
+| `YouTubeArgumentError` | `INVALID_ARGUMENT` | The MIME type is not accepted, a known size is zero or over the limit, or the body is not a supported form. Nothing was sent. An empty stream is refused too, once its session is open |
+| `YouTubeUploadError` | `UPLOAD_FAILED` | The transfer failed: a single request did not get through, no session could be opened or reached, too many failures in a row, or the session expired. Carries `uploaded`, and `sessionUri` when the session can still be resumed |
 | `YouTubeApiError` | By status | The API refused the upload. `reason` says why: `uploadLimitExceeded`, `invalidTitle`, `invalidDescription`, `invalidTags`, `invalidCategoryId`, `invalidVideoMetadata` |
 | `YouTubeApiError` | `QUOTA_EXCEEDED` | The project used its uploads for the day |
 | `YouTubeQuotaBudgetError` | `QUOTA_BUDGET_EXCEEDED` | With `quota.enforce`, the local count says the bucket is empty. Nothing was sent |
@@ -426,9 +476,13 @@ try {
 The MIME check reads the type you gave or the one the media carries. A message such as this one means the type is wrong, not the file:
 
 ```ts
-await yt.thumbnails.set({ videoId, media: { body: image, mimeType: "image/webp" } });
+await yt.thumbnails.set({
+  videoId,
+  media: { body: image, mimeType: "image/webp" },
+});
 // YouTubeArgumentError: thumbnails.set does not accept "image/webp".
-// Accepted types: image/jpeg, image/png, application/octet-stream. Set `media.mimeType`.
+// Accepted types: image/jpeg, image/png, application/octet-stream.
+// Set `media.mimeType`.
 ```
 
 A size limit can only be checked before sending when the size is known. For a stream, the API is the one that refuses.
@@ -458,7 +512,7 @@ All of them need OAuth. The same numbers are available in code as `METHODS["thum
 | `mimeType` | From the body | MIME type sent to the API |
 | `size` | | Total size in bytes of a stream, for the progress percentage only |
 | `chunkSize` | 8 MiB | Bytes per request in a resumable session. Rounded to a multiple of 256 KiB |
-| `onProgress` | | Called with an `UploadProgress` after each confirmed chunk |
+| `onProgress` | | Called with an `UploadProgress` when the session opens and after each confirmed chunk |
 | `resumeUri` | | Session URI of an interrupted upload, to carry on where it stopped |
 
 ### `fileMedia(path, options)`

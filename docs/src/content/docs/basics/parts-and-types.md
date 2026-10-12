@@ -9,7 +9,7 @@ sidebar:
 const { items } = await yt.videos.list({
   part: ["snippet", "statistics"],
   id: "dQw4w9WgXcQ",
-});
+}); // 1 unit
 const video = items[0];
 
 if (video) {
@@ -22,13 +22,16 @@ if (video) {
 
 ## What a part is
 
-A YouTube resource is split into parts. A video has `snippet` (title, description, thumbnails), `contentDetails` (duration, definition), `statistics` (views, likes), `status` (privacy) and a dozen more. Every read takes a `part` parameter and the API returns those parts and nothing else. Asking for more parts makes the response larger. It does not change the quota cost.
+A YouTube resource is split into parts. A video has `snippet` (title, description, thumbnails), `contentDetails` (duration, definition), `statistics` (views, likes), `status` (privacy) and 13 more. A read that takes a `part` parameter returns those parts and nothing else. Asking for more parts makes the response larger. It does not change the quota cost.
 
-`part` takes one name or a list:
+`part` takes one name or a list. Each of these calls costs 1 unit:
 
 ```ts
 await yt.channels.list({ part: "snippet", forHandle: "@GoogleDevelopers" });
-await yt.channels.list({ part: ["snippet", "statistics"], forHandle: "@GoogleDevelopers" });
+await yt.channels.list({
+  part: ["snippet", "statistics"],
+  forHandle: "@GoogleDevelopers",
+});
 ```
 
 The names are checked. A typo, or a part of another resource, does not compile:
@@ -49,10 +52,12 @@ The type of each item is built from the parts in the call.
 | A requested part the API may leave out | Optional: `video.liveStreamingDetails?` |
 | A part that was not requested | Absent. Reading it is a compile error |
 
-Some parts only exist in some situations, even when you ask for them. `liveStreamingDetails` is only there for a live or premiered video, `brandPartner` only for a sponsored one. Those stay optional, so the compiler makes you handle the case:
+Some parts only exist in some situations, even when you ask for them. `liveStreamingDetails` is only there when the video is an upcoming, live or completed live broadcast. Those parts stay optional, so the compiler makes you handle the case:
 
 ```ts
-const video = await yt.videos.list({ part: ["snippet", "liveStreamingDetails"], id: videoId }).first();
+const video = await yt.videos
+  .list({ part: ["snippet", "liveStreamingDetails"], id: videoId })
+  .first(); // 1 unit
 
 const chatId = video?.liveStreamingDetails?.activeLiveChatId;
 ```
@@ -67,23 +72,23 @@ Parts that are always returned when requested, for the three resources you will 
 
 ## Fields inside a part
 
-Inside a part, a field is required when YouTube returns it for every resource, and optional otherwise. The optional ones are worth knowing, because they are where code written from a single example breaks:
+Inside a part, some fields are required and others optional. The optional ones are worth knowing, because they are where code written from a single example breaks:
 
 ```ts
-const video = await yt.videos.get(videoId);
+const video = await yt.videos.get(videoId); // 1 unit
 
 if (video) {
-  video.snippet.title; // string: always there
-  video.snippet.tags; // string[] | undefined: absent when the video has no tags
-  video.statistics.viewCount; // string: always there
-  video.statistics.likeCount; // string | undefined: the owner can hide it
-  video.statistics.commentCount; // string | undefined: absent when comments are off
+  video.snippet.title; // string
+  video.snippet.tags; // string[] | undefined
+  video.statistics.viewCount; // string
+  video.statistics.likeCount; // string | undefined
+  video.statistics.commentCount; // string | undefined
 }
 ```
 
-Counts are strings because they are 64-bit integers, which JSON numbers cannot carry safely. Convert with `Number()` when you need arithmetic, or display them with [`formatCount`](/basics/ids-and-urls/#formatting).
+Counts are 64-bit integers, which the API sends as strings. Convert with `Number()` when you need arithmetic, or display them with [`formatCount`](/basics/ids-and-urls/#formatting).
 
-Thumbnails are all optional too. A deleted or private video inside a playlist has none. [`bestThumbnail`](/basics/ids-and-urls/#formatting) picks the largest one there is.
+A thumbnail set can be empty: a deleted or private video inside a playlist has none. [`bestThumbnail`](/basics/ids-and-urls/#formatting) picks the largest one there is.
 
 ## Naming the types
 
@@ -96,7 +101,9 @@ function describe(video: Video<"snippet" | "statistics">): string {
   return `${video.snippet.title} (${video.statistics.viewCount} views)`;
 }
 
-const video = await yt.videos.get(videoId, { part: ["snippet", "statistics", "status"] });
+const video = await yt.videos.get(videoId, {
+  part: ["snippet", "statistics", "status"],
+});
 if (video) describe(video); // more parts than needed is fine
 ```
 
@@ -108,6 +115,9 @@ import type { Video } from "@ix-xs/youtube.api";
 function titleOf(video: Video): string {
   return video.snippet?.title ?? "(no snippet)";
 }
+
+const video = await yt.videos.get(videoId, { part: "snippet" });
+if (video) titleOf(video);
 ```
 
 ## Helpers choose parts for you
@@ -124,24 +134,31 @@ const slim = await yt.videos.get(videoId, { part: "status" });
 
 | Helper | Default parts |
 | --- | --- |
-| `yt.videos.get`, `getMany`, `popular`, `yt.channels.latestVideos`, `yt.playlists.videos` | `snippet`, `contentDetails`, `statistics` |
+| `yt.videos.get`, `getMany`, `popular`, `yt.channels.latestVideo`, `latestVideos`, `yt.playlists.videos` | `snippet`, `contentDetails`, `statistics` |
 | `yt.channels.get`, `mine` | `snippet`, `contentDetails`, `statistics` |
 | `yt.playlists.get` | `snippet`, `contentDetails`, `status` |
 | `yt.channels.uploads`, `yt.playlists.items` | `snippet`, `contentDetails` |
+| `yt.commentThreads.forVideo`, `yt.comments.replies` | `snippet` |
 
 ## Writes
 
-A write sends parts and gets the same parts back. `part` is optional there: left out, it is the list of parts present in `body`.
+A write sends parts and gets the same parts back. `part` is optional there: left out, it is the list of parts present in `body`. Each of these two calls costs 50 units:
 
 ```ts
 const playlist = await yt.playlists.insert({
-  body: { snippet: { title: "Favourites" }, status: { privacyStatus: "private" } },
+  body: {
+    snippet: { title: "Favourites" },
+    status: { privacyStatus: "private" },
+  },
 });
 playlist.id; // string: a created resource always has its id
 
 const typed = await yt.playlists.insert({
   part: ["snippet", "status"],
-  body: { snippet: { title: "Favourites" }, status: { privacyStatus: "private" } },
+  body: {
+    snippet: { title: "Favourites" },
+    status: { privacyStatus: "private" },
+  },
 });
 typed.snippet.title; // string: with an explicit part, the result is narrowed
 ```
@@ -150,24 +167,27 @@ Bodies accept any subset of the resource, at any depth, and their values are sti
 
 ```ts
 await yt.playlists.insert({
-  // @ts-expect-error privacyStatus is "public", "unlisted" or "private"
-  body: { snippet: { title: "Favourites" }, status: { privacyStatus: "secret" } },
+  body: {
+    snippet: { title: "Favourites" },
+    // @ts-expect-error privacyStatus is "public", "unlisted" or "private"
+    status: { privacyStatus: "secret" },
+  },
 });
 ```
 
 :::caution
-An update replaces every part it sends. If you send `snippet` with only a new title, the description and tags are erased. Read the part, change it, send it back. [Videos](/resources/videos/#updating-a-video) shows the pattern.
+An update replaces every part it sends, whole. What you leave out of a part is not kept. Read the part, change it, send it back. [Videos](/resources/videos/#updating-a-video) shows the pattern.
 :::
 
 ## Smaller responses with `fields`
 
-`part` chooses whole parts. `fields` goes further and names the exact fields to return, which shrinks the payload on slow connections. The types are not narrowed by it, so only read what you asked for.
+`part` chooses whole parts. The `fields` request option goes further and names the exact fields to return, which shrinks the payload. The types are not narrowed by it, so only read what you asked for.
 
 ```ts
 const page = await yt.playlistItems.list(
   { part: "snippet", playlistId },
   { fields: "items(snippet(title,resourceId/videoId)),nextPageToken" },
-);
+); // 1 unit
 ```
 
 ## Reference
@@ -178,7 +198,7 @@ const page = await yt.playlistItems.list(
 | `Video`, `Channel`, ... without argument | The full resource, every part optional |
 | `VideoPart`, `ChannelPart`, ... | The union of the part names of a resource |
 | `VideoResource`, `ChannelResource`, ... | The same full resource, under its own name |
-| `Identified<T>` | What a write returns without `part`: `kind`, `etag` and `id` are known |
+| `Identified<T>` | What a write returns without `part`: `kind`, `etag` and `id` are known, every part is optional |
 | `Body<T>` | A request body: the resource with every field optional, at any depth |
 
 There are 26 resources typed this way. [All exports](/reference/exports/#resources) lists them.

@@ -43,6 +43,7 @@ jobs:
           npm install
           node scripts/reference.mjs --check
           npm run check-samples
+          npm run check-translation
           npm run build
           npm run check-links
       - uses: actions/upload-pages-artifact@v5
