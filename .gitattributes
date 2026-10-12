@@ -1,0 +1,19 @@
+# Normalise line endings to LF in the repo (avoids CRLF noise on Windows).
+* text=auto eol=lf
+
+*.sh   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+
+*.png  binary
+*.jpg  binary
+*.gif  binary
+*.ico  binary
+*.woff binary
+*.woff2 binary
+
+# Keep generated and vendored files out of the language stats and collapsed in diffs.
+src/generated/**       linguist-generated
+scripts/discovery/**   linguist-vendored
+docs/**                linguist-documentation
+examples/**            linguist-documentation

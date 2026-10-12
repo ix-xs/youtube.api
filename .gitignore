@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build output (rebuilt on publish via prepublishOnly)
+dist/
+docs/dist/
+docs/.astro/
+
+# Tests / coverage / TS build info
+coverage/
+*.tsbuildinfo
+
+# Packaged artifacts
+*.tgz
+
+# Secrets & local environment - the template .env.example IS committed
+.env
+.env.*
+!.env.example
+tokens.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS & editor cruft
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

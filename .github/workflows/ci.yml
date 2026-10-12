@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - name: Generated files are up to date
+        run: npm run generate -- --check
+      - name: Prose style
+        run: npm run lint:prose
+      - name: Typecheck (src)
+        run: npm run typecheck
+      - name: Type-level tests and doc examples
+        run: npm run test:types
+      - name: Build (dual ESM/CJS + types)
+        run: npm run build
+      - name: Unit tests
+        run: npm test
+      - name: Smoke tests of the build
+        run: npm run smoke
+
+  oldest-node:
+    # The package supports Node 20, which the test tooling no longer does.
+    # The build is made on a current Node, then exercised on 20 with plain Node.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+      - run: npm run smoke
+
+  package:
+    # Verifies the published types resolve in CJS, ESM, node10, node16 and bundler.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Are the types wrong?
+        run: npx --yes @arethetypeswrong/cli@latest --pack .

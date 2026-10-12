@@ -1,0 +1,48 @@
+name: Release
+
+# Creates a GitHub Release whenever a version tag (v*) is pushed, using the
+# matching section of CHANGELOG.md as the release notes. npm publishing stays
+# manual (`npm publish`); this only handles the GitHub side.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v1.0.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Resolve tag and extract changelog notes
+        id: notes
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then TAG="${{ github.event.inputs.tag }}"; fi
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          awk -v ver="$VERSION" '
+            index($0, "## " ver) == 1 && (substr($0, length("## " ver) + 1, 1) == "" || substr($0, length("## " ver) + 1, 1) == " ") { flag = 1; next }
+            /^## / { flag = 0 }
+            flag { print }
+          ' CHANGELOG.md > RELEASE_NOTES.md
+          if [ ! -s RELEASE_NOTES.md ]; then echo "See [CHANGELOG.md](./CHANGELOG.md)." > RELEASE_NOTES.md; fi
+
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.notes.outputs.tag }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "$TAG" --notes-file RELEASE_NOTES.md
+          else
+            gh release create "$TAG" --title "$TAG" --notes-file RELEASE_NOTES.md --verify-tag
+          fi

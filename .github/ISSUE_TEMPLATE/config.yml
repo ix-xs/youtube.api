@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://ix-xs.github.io/youtube.api/
+    about: Guides, one page per resource, the quota table and recipes.
+  - name: Usage question
+    url: https://github.com/ix-xs/youtube.api/discussions
+    about: Ask how to do something (please do not open an issue for questions).

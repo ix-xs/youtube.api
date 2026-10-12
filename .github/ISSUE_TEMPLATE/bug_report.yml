@@ -1,0 +1,41 @@
+name: Bug report
+description: Something is not working as documented.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting! Please fill in the details below so it can be reproduced. Remove API keys and tokens from anything you paste.
+  - type: input
+    id: version
+    attributes:
+      label: "@ix-xs/youtube.api version"
+      placeholder: "2.0.0"
+    validations:
+      required: true
+  - type: input
+    id: runtime
+    attributes:
+      label: Runtime and version
+      placeholder: "Node.js 22.x, Bun 1.x, Chrome, Cloudflare Workers..."
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead? Include `error.code` and `error.reason` if there is an error.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: The smallest snippet that shows the problem.
+      render: ts
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / stack trace
+      render: shell

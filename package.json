@@ -1,0 +1,110 @@
+{
+  "name": "@ix-xs/youtube.api",
+  "version": "2.0.0",
+  "description": "The complete YouTube API client for JavaScript and TypeScript. Every Data API v3, Live Streaming, Analytics and Reporting method, typed by the parts you request, with pagination, quota tracking, OAuth 2.0, resumable uploads, live chat and upload notifications. Zero dependencies.",
+  "keywords": [
+    "youtube",
+    "youtube-api",
+    "youtube-data-api",
+    "youtube-v3",
+    "youtube-analytics",
+    "youtube-live",
+    "live-chat",
+    "google-api",
+    "oauth2",
+    "typescript",
+    "api-client",
+    "sdk",
+    "videos",
+    "playlists",
+    "channels",
+    "upload",
+    "websub",
+    "quota",
+    "zero-dependency",
+    "esm"
+  ],
+  "author": "ix-xs.dev <contact@ix-xs.dev>",
+  "license": "MIT",
+  "homepage": "https://ix-xs.github.io/youtube.api/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ix-xs/youtube.api.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ix-xs/youtube.api/issues"
+  },
+  "type": "commonjs",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "./node": {
+      "import": {
+        "types": "./dist/node.d.mts",
+        "default": "./dist/node.mjs"
+      },
+      "require": {
+        "types": "./dist/node.d.ts",
+        "default": "./dist/node.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "node": [
+        "./dist/node.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "generate": "node scripts/generate.mjs",
+    "discovery:update": "node scripts/update-discovery.mjs",
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:types": "tsc -p tsconfig.test.json",
+    "lint:prose": "node scripts/lint-prose.mjs",
+    "attw": "attw --pack .",
+    "smoke": "node test/smoke/cjs.cjs && node test/smoke/esm.mjs",
+    "live": "tsx test/live/run.mts",
+    "check": "npm run generate -- --check && npm run lint:prose && npm run typecheck && npm run test:types && npm run build && npm test && npm run smoke",
+    "docs": "npm --prefix docs install && npm --prefix docs run dev",
+    "docs:build": "npm --prefix docs install && npm --prefix docs run build",
+    "prepublishOnly": "npm run check"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
+    "@types/node": "^22.10.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
