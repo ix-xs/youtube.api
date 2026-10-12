@@ -141,18 +141,18 @@ export interface ReportingJobsListParams extends OnBehalfOfContentOwner {
    * If set to true, also system-managed jobs will be returned; otherwise only user-created jobs will
    * be returned. System-managed jobs can neither be modified nor deleted.
    */
-  includeSystemManaged?: boolean;
+  includeSystemManaged?: boolean | undefined;
   /**
    * Requested page size. Server may return fewer jobs than requested. If unspecified, server will pick
    * an appropriate default.
    */
-  pageSize?: number;
+  pageSize?: number | undefined;
   /**
    * A token identifying a page of results the server should return. Typically, this is the value of
    * ListReportTypesResponse.next_page_token returned in response to the previous call to the
    * `ListJobs` method.
    */
-  pageToken?: string;
+  pageToken?: string | undefined;
 }
 
 /** Parameters of `reporting.jobs.reports.get`. */
@@ -168,25 +168,25 @@ export interface ReportingReportsListParams extends OnBehalfOfContentOwner {
   /** The ID of the job. */
   jobId: string;
   /** If set, only reports created after the specified date/time are returned. */
-  createdAfter?: string | Date;
+  createdAfter?: string | Date | undefined;
   /**
    * Requested page size. Server may return fewer report types than requested. If unspecified, server
    * will pick an appropriate default.
    */
-  pageSize?: number;
+  pageSize?: number | undefined;
   /**
    * A token identifying a page of results the server should return. Typically, this is the value of
    * ListReportsResponse.next_page_token returned in response to the previous call to the `ListReports`
    * method.
    */
-  pageToken?: string;
+  pageToken?: string | undefined;
   /**
    * If set, only reports whose start time is greater than or equal the specified date/time are
    * returned.
    */
-  startTimeAtOrAfter?: string | Date;
+  startTimeAtOrAfter?: string | Date | undefined;
   /** If set, only reports whose start time is smaller than the specified date/time are returned. */
-  startTimeBefore?: string | Date;
+  startTimeBefore?: string | Date | undefined;
 }
 
 /** Parameters of `reporting.media.download`. */
@@ -201,18 +201,18 @@ export interface ReportingReportTypesListParams extends OnBehalfOfContentOwner {
    * If set to true, also system-managed report types will be returned; otherwise only the report types
    * that can be used to create new reporting jobs will be returned.
    */
-  includeSystemManaged?: boolean;
+  includeSystemManaged?: boolean | undefined;
   /**
    * Requested page size. Server may return fewer report types than requested. If unspecified, server
    * will pick an appropriate default.
    */
-  pageSize?: number;
+  pageSize?: number | undefined;
   /**
    * A token identifying a page of results the server should return. Typically, this is the value of
    * ListReportTypesResponse.next_page_token returned in response to the previous call to the
    * `ListReportTypes` method.
    */
-  pageToken?: string;
+  pageToken?: string | undefined;
 }
 
 /** `yt.reporting.jobs`: the `jobs` methods of the YouTube Reporting API. */

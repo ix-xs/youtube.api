@@ -115,7 +115,7 @@ describe("yt.videos", () => {
   it("lists the popular chart", async () => {
     const { yt, calls } = client(list([]));
     await yt.videos.popular({ regionCode: "FR", videoCategoryId: "10", part: "id" });
-    expect(Object.fromEntries(calls[0]!.url.searchParams)).toEqual({ part: "id", chart: "mostPopular", regionCode: "FR", videoCategoryId: "10" });
+    expect(Object.fromEntries(calls[0]!.url.searchParams)).toEqual({ part: "id", chart: "mostPopular", regionCode: "FR", videoCategoryId: "10", maxResults: "50" });
   });
 
   it("rates videos", async () => {
@@ -130,10 +130,10 @@ describe("yt.videos", () => {
 
 describe("yt.playlists", () => {
   it("reads a playlist and its items from a URL", async () => {
-    const { yt, calls } = client((call) => (resource(call) === "playlists" ? list([{ id: "PL123" }]) : list([{ id: "i1" }])));
-    expect((await yt.playlists.get("https://www.youtube.com/playlist?list=PL123", { part: "id" }))?.id).toBe("PL123");
-    await yt.playlists.items(`https://www.youtube.com/watch?v=${VIDEO_ID}&list=PL123`).first();
-    expect(param(calls[1]!, "playlistId")).toBe("PL123");
+    const { yt, calls } = client((call) => (resource(call) === "playlists" ? list([{ id: "PLBCF2DAC6FFB574DE" }]) : list([{ id: "i1" }])));
+    expect((await yt.playlists.get("https://www.youtube.com/playlist?list=PLBCF2DAC6FFB574DE", { part: "id" }))?.id).toBe("PLBCF2DAC6FFB574DE");
+    await yt.playlists.items(`https://www.youtube.com/watch?v=${VIDEO_ID}&list=PLBCF2DAC6FFB574DE`).first();
+    expect(param(calls[1]!, "playlistId")).toBe("PLBCF2DAC6FFB574DE");
     await expect(yt.playlists.get(`https://youtu.be/${VIDEO_ID}`)).rejects.toBeInstanceOf(YouTubeArgumentError);
   });
 
@@ -148,12 +148,12 @@ describe("yt.playlists", () => {
       return list(param(call, "id")!.split(",").filter((id) => id !== "bbbbbbbbbbb").map((id) => ({ id })));
     });
     const seen: string[] = [];
-    for await (const video of yt.playlists.videos("PL123", { part: "id" })) seen.push(video.id);
+    for await (const video of yt.playlists.videos("PLBCF2DAC6FFB574DE", { part: "id" })) seen.push(video.id);
     expect(seen).toEqual(["aaaaaaaaaaa", "ccccccccccc"]);
     expect(calls.map(resource)).toEqual(["playlistItems", "videos", "playlistItems", "videos"]);
 
     const limited: string[] = [];
-    for await (const video of yt.playlists.videos("PL123", { part: "id", limit: 1 })) limited.push(video.id);
+    for await (const video of yt.playlists.videos("PLBCF2DAC6FFB574DE", { part: "id", limit: 1 })) limited.push(video.id);
     expect(limited).toEqual(["aaaaaaaaaaa"]);
   });
 
@@ -169,12 +169,12 @@ describe("yt.playlists", () => {
     await yt.playlists.create({ title: "Mix", description: "d", privacy: "unlisted" });
     expect(calls[0]!.body).toEqual({ snippet: { title: "Mix", description: "d" }, status: { privacyStatus: "unlisted" } });
 
-    await yt.playlists.add("PL123", `https://youtu.be/${VIDEO_ID}`, { position: 0 });
+    await yt.playlists.add("PLBCF2DAC6FFB574DE", `https://youtu.be/${VIDEO_ID}`, { position: 0 });
     expect(resource(calls[1]!)).toBe("playlistItems");
-    expect(calls[1]!.body).toEqual({ snippet: { playlistId: "PL123", resourceId: { kind: "youtube#video", videoId: VIDEO_ID }, position: 0 } });
+    expect(calls[1]!.body).toEqual({ snippet: { playlistId: "PLBCF2DAC6FFB574DE", resourceId: { kind: "youtube#video", videoId: VIDEO_ID }, position: 0 } });
 
-    expect(await yt.playlists.removeVideo("PL123", VIDEO_ID)).toBe(2);
-    expect(Object.fromEntries(calls[2]!.url.searchParams)).toMatchObject({ playlistId: "PL123", videoId: VIDEO_ID });
+    expect(await yt.playlists.removeVideo("PLBCF2DAC6FFB574DE", VIDEO_ID)).toBe(2);
+    expect(Object.fromEntries(calls[2]!.url.searchParams)).toMatchObject({ playlistId: "PLBCF2DAC6FFB574DE", videoId: VIDEO_ID });
     expect(calls.slice(3).map((call) => `${call.method} ${param(call, "id")}`)).toEqual(["DELETE item1", "DELETE item2"]);
   });
 });
@@ -196,7 +196,7 @@ describe("search, comments and subscriptions", () => {
   it("reads and writes comments", async () => {
     const { yt, calls } = client((call) => (call.method === "GET" ? list([]) : json({ id: "c1" })), { accessToken: "t" });
     await yt.commentThreads.forVideo(`https://youtu.be/${VIDEO_ID}`, { order: "relevance", part: ["snippet", "replies"] });
-    expect(Object.fromEntries(calls[0]!.url.searchParams)).toEqual({ part: "snippet,replies", videoId: VIDEO_ID, order: "relevance" });
+    expect(Object.fromEntries(calls[0]!.url.searchParams)).toEqual({ part: "snippet,replies", videoId: VIDEO_ID, order: "relevance", maxResults: "100" });
     await yt.commentThreads.post(VIDEO_ID, "Nice");
     expect(calls[1]!.body).toEqual({ snippet: { videoId: VIDEO_ID, topLevelComment: { snippet: { textOriginal: "Nice" } } } });
     await yt.comments.replies("thread1").all();

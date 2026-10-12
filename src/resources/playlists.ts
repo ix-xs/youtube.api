@@ -15,11 +15,11 @@ export type DefaultPlaylistPart = "snippet" | "contentDetails" | "status";
 /** Fields of {@link Playlists.create}. */
 export interface CreatePlaylistInput {
   title: string;
-  description?: string;
+  description?: string | undefined;
   /** Default `"private"`. */
-  privacy?: "public" | "unlisted" | "private";
+  privacy?: "public" | "unlisted" | "private" | undefined;
   /** Language of the title and description, for example `"en"`. */
-  defaultLanguage?: string;
+  defaultLanguage?: string | undefined;
 }
 
 function requirePlaylistId(playlist: string): string {
@@ -51,6 +51,8 @@ export class Playlists extends PlaylistsApi {
    * Fetches one playlist from its id or URL. Resolves to `null` when it does
    * not exist or is private.
    *
+   * Quota: 1 unit.
+   *
    * @example
    * const playlist = await yt.playlists.get("PLBCF2DAC6FFB574DE");
    * if (playlist) console.log(playlist.snippet.title, playlist.contentDetails.itemCount);
@@ -76,12 +78,13 @@ export class Playlists extends PlaylistsApi {
     options: PartOptions<P> = {},
   ): ListRequest<PlaylistItem<P>, PlaylistItemListResponse> {
     const { part = ["snippet", "contentDetails"] as readonly PlaylistItemPart[] as readonly P[], ...request } = options;
-    return this._list(METHODS["playlistItems.list"], { part, playlistId: requirePlaylistId(playlist) }, request);
+    return this._list(METHODS["playlistItems.list"], { part, playlistId: requirePlaylistId(playlist) }, request, true);
   }
 
   /**
    * Walks the videos of a playlist as full video resources, in playlist
-   * order. Deleted and private videos are skipped.
+   * order. Deleted and private videos are skipped, and `limit` counts the
+   * videos you get, not the playlist items read.
    *
    * Quota: 2 units per 50 videos.
    *
@@ -93,17 +96,22 @@ export class Playlists extends PlaylistsApi {
    */
   async *videos<P extends VideoPart = DefaultVideoPart>(
     playlist: string,
-    options: PartOptions<P> & { limit?: number } = {},
+    options: PartOptions<P> & { limit?: number | undefined } = {},
   ): AsyncGenerator<Video<P>, void, undefined> {
     const { part, limit = Number.POSITIVE_INFINITY, ...request } = options;
+    if (limit <= 0) return;
     let yielded = 0;
-    for await (const page of this.items(playlist, { ...request, part: "contentDetails" }).pages(Number.isFinite(limit) ? { limit } : {})) {
+    for await (const page of this.items(playlist, { ...request, part: "contentDetails" }).pages()) {
       const ids = page.items.map((item) => item.contentDetails.videoId);
-      for (const video of await this.#yt.videos.getMany<P>(ids, { ...request, ...(part !== undefined ? { part } : {}) })) {
-        if (yielded++ >= limit) return;
+      const found = await this.#yt.videos.getMany<P>(ids, { ...request, ...(part !== undefined ? { part } : {}) });
+      const byId = new Map(found.map((video) => [(video as { id: string }).id, video]));
+      // Playlist order, repeats included; what the API did not return is skipped.
+      for (const id of ids) {
+        const video = byId.get(id);
+        if (!video) continue;
         yield video;
+        if (++yielded >= limit) return;
       }
-      if (yielded >= limit) return;
     }
   }
 
@@ -130,7 +138,7 @@ export class Playlists extends PlaylistsApi {
    * @example
    * await yt.playlists.add(playlistId, "https://youtu.be/dQw4w9WgXcQ", { position: 0 });
    */
-  add(playlist: string, video: string, options: RequestOptions & { position?: number; note?: string } = {}): Promise<PlaylistItem<"snippet" | "contentDetails">> {
+  add(playlist: string, video: string, options: RequestOptions & { position?: number | undefined; note?: string | undefined } = {}): Promise<PlaylistItem<"snippet" | "contentDetails">> {
     const { position, note, ...request } = options;
     const snippet: Record<string, unknown> = {
       playlistId: requirePlaylistId(playlist),

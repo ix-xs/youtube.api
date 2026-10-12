@@ -24,14 +24,14 @@ describe("parseUrl", () => {
     [`https://www.youtube.com/watch?v=${VIDEO_ID}`, { type: "video", videoId: VIDEO_ID, format: "watch" }],
     [`https://youtu.be/${VIDEO_ID}?t=42`, { type: "video", videoId: VIDEO_ID, format: "watch", start: 42 }],
     [`youtube.com/watch?v=${VIDEO_ID}&t=1h2m3s`, { type: "video", videoId: VIDEO_ID, format: "watch", start: 3723 }],
-    [`https://m.youtube.com/watch?v=${VIDEO_ID}&list=PL123&index=2`, { type: "video", videoId: VIDEO_ID, format: "watch", playlistId: "PL123" }],
+    [`https://m.youtube.com/watch?v=${VIDEO_ID}&list=PLBCF2DAC6FFB574DE&index=2`, { type: "video", videoId: VIDEO_ID, format: "watch", playlistId: "PLBCF2DAC6FFB574DE" }],
     [`https://music.youtube.com/watch?v=${VIDEO_ID}`, { type: "video", videoId: VIDEO_ID, format: "watch" }],
     [`https://www.youtube.com/shorts/${VIDEO_ID}`, { type: "video", videoId: VIDEO_ID, format: "short" }],
     [`https://www.youtube.com/live/${VIDEO_ID}?feature=share`, { type: "video", videoId: VIDEO_ID, format: "live" }],
     [`https://www.youtube.com/embed/${VIDEO_ID}?start=10`, { type: "video", videoId: VIDEO_ID, format: "embed", start: 10 }],
     [`https://www.youtube-nocookie.com/embed/${VIDEO_ID}`, { type: "video", videoId: VIDEO_ID, format: "embed" }],
     ["https://www.youtube.com/playlist?list=PLBCF2DAC6FFB574DE", { type: "playlist", playlistId: "PLBCF2DAC6FFB574DE" }],
-    ["https://www.youtube.com/embed/videoseries?list=PL123", { type: "playlist", playlistId: "PL123" }],
+    ["https://www.youtube.com/embed/videoseries?list=PLBCF2DAC6FFB574DE", { type: "playlist", playlistId: "PLBCF2DAC6FFB574DE" }],
     [`https://www.youtube.com/channel/${CHANNEL_ID}/videos`, { type: "channel", channelId: CHANNEL_ID }],
     ["https://www.youtube.com/@GoogleDevelopers", { type: "channel", handle: "@GoogleDevelopers" }],
     ["https://www.youtube.com/@GoogleDevelopers/streams", { type: "channel", handle: "@GoogleDevelopers" }],
@@ -64,9 +64,9 @@ describe("ids", () => {
   it("extracts ids from ids and URLs", () => {
     expect(videoIdFrom(` ${VIDEO_ID} `)).toBe(VIDEO_ID);
     expect(videoIdFrom(`https://youtu.be/${VIDEO_ID}`)).toBe(VIDEO_ID);
-    expect(videoIdFrom("https://www.youtube.com/playlist?list=PL123")).toBeNull();
-    expect(playlistIdFrom("PL123")).toBe("PL123");
-    expect(playlistIdFrom(`https://www.youtube.com/watch?v=${VIDEO_ID}&list=PL123`)).toBe("PL123");
+    expect(videoIdFrom("https://www.youtube.com/playlist?list=PLBCF2DAC6FFB574DE")).toBeNull();
+    expect(playlistIdFrom("PLBCF2DAC6FFB574DE")).toBe("PLBCF2DAC6FFB574DE");
+    expect(playlistIdFrom(`https://www.youtube.com/watch?v=${VIDEO_ID}&list=PLBCF2DAC6FFB574DE`)).toBe("PLBCF2DAC6FFB574DE");
     expect(playlistIdFrom(`https://youtu.be/${VIDEO_ID}`)).toBeNull();
   });
 

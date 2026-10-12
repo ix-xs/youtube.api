@@ -375,7 +375,7 @@ export async function videos_update() {
 export async function watermarks_set() {
   await yt.watermarks.set({
     channelId,
-    body: { timing: { type: "offsetFromStart", offsetMs: "15000" }, position: { type: "corner", cornerPosition: "topRight" } },
+    body: { timing: { type: "offsetFromStart", offsetMs: "15000", durationMs: "10000" } },
     media: image,
   });
 }

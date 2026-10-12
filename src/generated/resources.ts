@@ -315,8 +315,8 @@ export class ChannelBannersApi extends ResourceBase {
 /** `yt.channels`: the `channels` methods of the YouTube Data API v3. */
 export class ChannelsApi extends ResourceBase {
   /**
-   * Fetches channels by id, handle, legacy username, or the authenticated user's own channel. Pass
-   * exactly one of `id`, `forHandle`, `forUsername`, `mine` or `managedByMe`.
+   * Fetches channels by id, handle, legacy username, or the authenticated user's own channel. Pass one
+   * filter: `id`, `forHandle`, `forUsername`, `mine`, `managedByMe` or `mySubscribers`.
    *
    * Quota: 1 unit. Auth: API key, or OAuth to see private data.
    *
@@ -461,7 +461,7 @@ export class CommentsApi extends ResourceBase {
   }
 
   /**
-   * Flagged comments as spam.
+   * Flags comments as spam.
    *
    * Quota: 50 units. Auth: OAuth, with one of `youtube.force-ssl`.
    * @see https://developers.google.com/youtube/v3/docs/comments/markAsSpam
@@ -1339,7 +1339,7 @@ export class VideosApi extends ResourceBase {
    * const { items } = await yt.videos.batchGetStats({ part: ["statistics"], id: [videoId] });
    * @see https://developers.google.com/youtube/v3/docs/videos/batchGetStats
    */
-  batchGetStats<P extends VideoStatPart = never>(params?: VideosBatchGetStatsParams<P>, options?: RequestOptions): ListRequest<VideoStat<P>, BatchGetStatsResponse> {
+  batchGetStats<P extends VideoStatPart = never>(params: VideosBatchGetStatsParams<P>, options?: RequestOptions): ListRequest<VideoStat<P>, BatchGetStatsResponse> {
     return this._list(METHODS["videos.batchGetStats"], params, options);
   }
 
@@ -1396,7 +1396,7 @@ export class WatermarksApi extends ResourceBase {
    * @example
    * await yt.watermarks.set({
    *   channelId,
-   *   body: { timing: { type: "offsetFromStart", offsetMs: "15000" }, position: { type: "corner", cornerPosition: "topRight" } },
+   *   body: { timing: { type: "offsetFromStart", offsetMs: "15000", durationMs: "10000" } },
    *   media: image,
    * });
    * @see https://developers.google.com/youtube/v3/docs/watermarks/set

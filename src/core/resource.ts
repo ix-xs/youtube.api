@@ -14,8 +14,7 @@ export type Simplify<T> = { [K in keyof T]: T[K] } & {};
  * - Parts that were not requested are absent from the type, so reading them is
  *   a compile error instead of an `undefined` at runtime.
  *
- * Without a part list, or with all of them, the full resource with every part
- * optional is returned.
+ * Without a part list, the full resource with every part optional is returned.
  *
  * @typeParam T - The full resource.
  * @typeParam Part - Every part name of the resource.
@@ -24,13 +23,11 @@ export type Simplify<T> = { [K in keyof T]: T[K] } & {};
  */
 export type WithParts<T, Part extends keyof T, P extends Part, Always extends Part> = [P] extends [never]
   ? T
-  : [Part] extends [P]
-    ? T
-    : Simplify<
-        { [K in Extract<keyof T, "kind" | "etag" | "id">]-?: NonNullable<T[K]> } & {
-          [K in Exclude<Extract<P, Always>, "id">]-?: NonNullable<T[K]>;
-        } & { [K in Exclude<P, Always | "id">]?: T[K] }
-      >;
+  : Simplify<
+      { [K in Extract<keyof T, "kind" | "etag" | "id">]-?: NonNullable<T[K]> } & {
+        [K in Exclude<Extract<P, Always>, "id">]-?: NonNullable<T[K]>;
+      } & { [K in Exclude<P, Always | "id">]?: T[K] }
+    >;
 
 /**
  * A resource the API just created or updated: its `kind`, `etag` and `id` are
@@ -90,9 +87,9 @@ export abstract class ResourceBase {
   }
 
   /** @internal */
-  protected _list<T, R>(spec: MethodSpec, params: object | (() => Promise<object>) | undefined, options?: RequestOptions): ListRequest<T, R> {
+  protected _list<T, R>(spec: MethodSpec, params: object | (() => Promise<object>) | undefined, options?: RequestOptions, fullPages = false): ListRequest<T, R> {
     const input = typeof params === "function" ? (params as () => Promise<Params>) : { ...(params as Params | undefined) };
-    return new ListRequest<T, R>(this.rest, spec, input, options);
+    return new ListRequest<T, R>(this.rest, spec, input, options, fullPages);
   }
 }
 

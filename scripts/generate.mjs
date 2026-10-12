@@ -42,9 +42,27 @@ const CURLY_DOUBLE = new RegExp(`[${String.fromCharCode(0x201c, 0x201d)}]`, "g")
 
 const pascal = (name) => name.charAt(0).toUpperCase() + name.slice(1);
 
+/** Wording that only makes sense inside Google. A sentence that carries it is dropped. */
+const INTERNAL = /\bgo\/[\w-]+|googleplex|\bViper\b|PixelCorp|\bStubby\b|\bApiary\b|One Platform|TAP rebuild|\bGAIA\b|Next I[dD]/;
+const TYPOS = [
+  [/\bthGe\b/g, "the"],
+  [/autmomatically/g, "automatically"],
+  [/channel"s/g, "channel's"],
+  [/__(\w+)__/g, "$1"],
+  [/channels's/g, "channel's"],
+  [/orignally/g, "originally"],
+];
+
 function clean(text) {
   if (!text) return "";
   let out = text.replace(/\s+/g, " ").trim();
+  // Annotations of the API description that leak into the text.
+  out = out.replace(/[",\s]*\b(?:required: true, )?(?:pattern|minValue|maxValue): .*$/, "").replace(/^Required\. /, "").replace(/",?\.?$/, "");
+  out = out
+    .split(/(?<=[.!?])\s+/)
+    .filter((sentence) => !INTERNAL.test(sentence))
+    .join(" ");
+  for (const [from, to] of TYPOS) out = out.replace(from, to);
   out = out
     .replace(/\s*@mutable\b.*$/, "")
     .replace(/\s*Next I[dD]: \d+\.?/g, "")
@@ -151,6 +169,11 @@ function buildModel(api, doc) {
     }
     // The streaming method returns the same messages as liveChatMessages.list.
     for (const method of methods) {
+      if (method.meta.partOf) {
+        if (!partResources.has(method.meta.partOf)) throw new Error(`${method.raw.id}: partOf names an unknown resource`);
+        method.partOf = method.meta.partOf;
+        continue;
+      }
       if (method.raw.request && partResources.has(method.raw.request.$ref)) method.partOf = method.raw.request.$ref;
       const ref = method.list?.item ?? method.raw.response?.$ref;
       if (method.raw.parameters?.part && ref && partResources.has(ref)) method.partOf = ref;
@@ -191,6 +214,8 @@ function buildModel(api, doc) {
 // -------------------------------------------------------------------- schemas
 
 function propType(model, prop, path) {
+  const override = config.schemaTypes?.[path];
+  if (override) return override;
   if (prop.$ref) return model.typeName(prop.$ref);
   if (prop.type === "array") {
     const inner = propType(model, prop.items ?? {}, path);
@@ -215,6 +240,7 @@ function propDoc(prop) {
     if (lines.length) blocks.push(`\t${lines.map(([value, text]) => `- \`${value}\`: ${text}`).join("\n")}`);
   }
   if (prop.format === "uint64" || prop.format === "int64") blocks.push("A 64-bit integer, sent as a string.");
+  if (prop.format === "google-duration") blocks.push("A number of seconds followed by `s`, for example `212s`. `parseDuration` reads it.");
   if (prop.format === "date-time" || prop.format === "google-datetime") blocks.push("ISO 8601 date and time.");
   if (prop.format === "byte") blocks.push("Base64 encoded.");
   if (prop.deprecated) blocks.push("@deprecated");
@@ -254,7 +280,7 @@ function emitSchemas(model) {
       config.required[ref] = Object.keys(schema.properties ?? {}).filter((key) => ["kind", "etag", "items"].includes(key));
       if (api.key !== "data") config.required[ref] = [];
     }
-    const blocks = [clean(schema.description)];
+    const blocks = [config.schemaDocs?.[ref] ?? clean(schema.description)];
     if (model.partResources.has(ref)) {
       blocks.push(`This is the full resource, with every part optional. \`${ref}<Parts>\` is the same resource narrowed to the parts you asked for.`);
     }
@@ -304,13 +330,12 @@ function paramType(model, method, name, param) {
 }
 
 function paramDoc(method, name, param, isWrite) {
+  const written = method.meta.docs?.[name];
+  if (written) return [written];
   if (name === "part") {
     if (!method.partOf) return [clean(param.description)];
-    return [
-      isWrite
-        ? "Parts the request writes and the response returns. Defaults to the parts present in `body`."
-        : "Parts to return. The response type follows this list: a part you did not ask for is not on the result.",
-    ];
+    if (isWrite && method.raw.request) return ["Parts the request writes and the response returns. Defaults to the parts present in `body`."];
+    return [isWrite ? "Parts the response returns. The response type follows this list." : "Parts to return. The response type follows this list: a part you did not ask for is not on the result."];
   }
   const blocks = [clean(param.description)];
   if (param.enum && param.enumDescriptions?.some(Boolean) && !method.meta.types?.[name]) {
@@ -374,7 +399,8 @@ function emitParams(model) {
     out += `export interface ${paramsName(model, method)}${generic}${owner ? ` extends ${owner}` : ""} {\n`;
     for (const entry of entries) {
       out += jsdoc(entry.doc, "  ");
-      out += `  ${entry.name}${entry.required ? "" : "?"}: ${entry.type};\n`;
+      // "| undefined" lets a caller with exactOptionalPropertyTypes pass a value that may be missing.
+      out += `  ${entry.name}${entry.required ? "" : "?"}: ${entry.type}${entry.required ? "" : " | undefined"};\n`;
     }
     out += "}\n\n";
   }
@@ -498,6 +524,7 @@ function emitSpec(model, method) {
     spec.upload = { path: raw.mediaUpload.protocols.simple.path, accept: raw.mediaUpload.accept, maxSize: Number(raw.mediaUpload.maxSize) };
   }
   if (raw.httpMethod !== "GET" && method.partOf && raw.request && params.part) spec.autoPart = true;
+  if (params.onBehalfOfContentOwner) spec.owner = true;
   if (method.meta.response === "text") spec.response = "text";
   else if (!raw.response || VOID_RESPONSES.has(raw.response.$ref)) spec.response = "none";
   return spec;

@@ -22,7 +22,8 @@ export type YouTubeErrorCode =
   | "INVALID_ARGUMENT"
   | "UPLOAD_FAILED"
   | "QUOTA_BUDGET_EXCEEDED"
-  | "FEED_UNAVAILABLE";
+  | "FEED_UNAVAILABLE"
+  | "HUB_ERROR";
 
 /**
  * The `reason` strings the YouTube API puts in its error bodies. The list
@@ -141,7 +142,7 @@ export interface ApiErrorInit {
 export class YouTubeApiError extends YouTubeError {
   /** HTTP status code. */
   readonly status: number;
-  /** First `reason` of the error body, for example `quotaExceeded`. */
+  /** The `reason` of the error body, for example `quotaExceeded`. When the body carries a more precise one in its details (an invalid key, a missing scope), that one is used. */
   readonly reason: YouTubeErrorReason | undefined;
   /** Every error entry the API returned. */
   readonly errors: ApiErrorDetail[];
@@ -225,7 +226,7 @@ export class YouTubeRequestError extends YouTubeError {
   readonly method: string;
 
   constructor(
-    code: "TIMEOUT" | "NETWORK" | "ABORTED" | "PARSE_ERROR" | "FEED_UNAVAILABLE",
+    code: "TIMEOUT" | "NETWORK" | "ABORTED" | "PARSE_ERROR" | "FEED_UNAVAILABLE" | "HUB_ERROR" | "SERVER_ERROR",
     method: string,
     message: string,
     options?: { cause?: unknown },
@@ -236,7 +237,11 @@ export class YouTubeRequestError extends YouTubeError {
   }
 }
 
-/** An argument was rejected before anything was sent, so no quota was spent. */
+/**
+ * The library itself refused something: an argument that cannot be right, or
+ * a reference that matched nothing (a handle with no channel, a video with no
+ * live chat). The API did not answer with an error.
+ */
 export class YouTubeArgumentError extends YouTubeError {
   constructor(message: string) {
     super("INVALID_ARGUMENT", message);
@@ -268,7 +273,11 @@ export class YouTubeQuotaBudgetError extends YouTubeError {
   }
 }
 
-/** A resumable upload could not be completed. `sessionUri` lets you resume it later. */
+/**
+ * An upload could not be completed. For a resumable upload that can still be
+ * resumed, `sessionUri` is set; it is undefined for a single-request upload
+ * and for a session that expired.
+ */
 export class YouTubeUploadError extends YouTubeError {
   /** Resumable session, valid for about a week. Pass it back as `resumeUri`. */
   readonly sessionUri: string | undefined;

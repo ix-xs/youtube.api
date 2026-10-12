@@ -23,24 +23,29 @@ export interface ActivitiesListParams<P extends ActivityPart = ActivityPart> {
    * result.
    */
   part: OneOrMany<P>;
-  channelId?: string;
+  /** Channel whose activities to list. */
+  channelId?: string | undefined;
   /**
    * The `maxResults` parameter specifies the maximum number of items that should be returned in the
    * result set.
    *
    * Between 0 and 50. Default 5.
    */
-  maxResults?: number;
-  mine?: boolean;
+  maxResults?: number | undefined;
+  /** List the activities of the authenticated user instead of a given channel. */
+  mine?: boolean | undefined;
   /**
    * The `pageToken` parameter identifies a specific page in the result set that should be returned. In
    * an API response, the nextPageToken and prevPageToken properties identify other pages that could be
    * retrieved.
    */
-  pageToken?: string;
-  publishedAfter?: string | Date;
-  publishedBefore?: string | Date;
-  regionCode?: string;
+  pageToken?: string | undefined;
+  /** Only activities that happened at or after this moment. */
+  publishedAfter?: string | Date | undefined;
+  /** Only activities that happened before this moment. */
+  publishedBefore?: string | Date | undefined;
+  /** ISO 3166-1 alpha-2 country code, used when the user's activity alone gives too few results. */
+  regionCode?: string | undefined;
 }
 
 /** Parameters of `captions.delete`. */
@@ -50,18 +55,19 @@ export interface CaptionsDeleteParams extends OnBehalfOfContentOwner {
 
 /** Parameters of `captions.download`. */
 export interface CaptionsDownloadParams extends OnBehalfOfContentOwner {
-  /** The ID of the caption track to download, required for One Platform. */
   id: string;
-  /** Convert the captions into this format. Supported options are sbv, srt, and vtt. */
-  tfmt?: "sbv" | "scc" | "srt" | "ttml" | "vtt";
+  /**
+   * Converts the track to this format. Left out, the track comes in the format it was uploaded in.
+   */
+  tfmt?: "sbv" | "scc" | "srt" | "ttml" | "vtt" | undefined;
   /** tlang is the language code; machine translate the captions into this language. */
-  tlang?: string;
+  tlang?: string | undefined;
 }
 
 /** Parameters of `captions.insert`. */
 export interface CaptionsInsertParams<P extends CaptionPart = CaptionPart> extends OnBehalfOfContentOwner {
   /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
   body: Body<CaptionResource>;
   /**
@@ -70,9 +76,10 @@ export interface CaptionsInsertParams<P extends CaptionPart = CaptionPart> exten
    */
   media: MediaInput;
   /**
-   * Extra parameter to allow automatically syncing the uploaded caption/transcript with the audio.
+   * No longer supported: since April 2024 YouTube does not time a transcript for you. The file must
+   * carry its own timing.
    */
-  sync?: boolean;
+  sync?: boolean | undefined;
 }
 
 /** Parameters of `captions.list`. */
@@ -84,42 +91,39 @@ export interface CaptionsListParams<P extends CaptionPart = CaptionPart> extends
   part: OneOrMany<P>;
   /** Returns the captions for the specified video. */
   videoId: string;
-  /**
-   * Returns the captions with the given IDs for Stubby or Apiary.
-   *
-   * Any number of ids: lists longer than 50 are split across calls.
-   */
-  id?: OneOrMany<string>;
+  /** Any number of ids: lists longer than 50 are split across calls. */
+  id?: OneOrMany<string> | undefined;
 }
 
 /** Parameters of `captions.update`. */
 export interface CaptionsUpdateParams<P extends CaptionPart = CaptionPart> extends OnBehalfOfContentOwner {
   /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
   body: Body<CaptionResource>;
   /**
    * The file to upload: a Blob, bytes, a stream, or `{ body, mimeType, onProgress }` for more control.
    * Accepted types: text/xml, application/octet-stream, any.
    */
-  media?: MediaInput;
+  media?: MediaInput | undefined;
   /**
-   * Extra parameter to allow automatically syncing the uploaded caption/transcript with the audio.
+   * No longer supported: since April 2024 YouTube does not time a transcript for you. The file must
+   * carry its own timing.
    */
-  sync?: boolean;
+  sync?: boolean | undefined;
 }
 
 /** Parameters of `channelBanners.insert`. */
 export interface ChannelBannersInsertParams extends OnBehalfOfContentOwnerChannel {
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
-  body?: Body<ChannelBannerResource>;
+  body?: Body<ChannelBannerResource> | undefined;
   /**
    * The file to upload: a Blob, bytes, a stream, or `{ body, mimeType, onProgress }` for more control.
    * Accepted types: image/jpeg, image/png, application/octet-stream.
    */
   media: MediaInput;
   /** Unused, channel_id is currently derived from the security context of the requestor. */
-  channelId?: string;
+  channelId?: string | undefined;
 }
 
 /** Parameters of `channelSections.delete`. */
@@ -130,7 +134,7 @@ export interface ChannelSectionsDeleteParams extends OnBehalfOfContentOwner {
 /** Parameters of `channelSections.insert`. */
 export interface ChannelSectionsInsertParams<P extends ChannelSectionPart = ChannelSectionPart> extends OnBehalfOfContentOwnerChannel {
   /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
   body: Body<ChannelSectionResource>;
 }
@@ -143,21 +147,17 @@ export interface ChannelSectionsListParams<P extends ChannelSectionPart = Channe
    */
   part: OneOrMany<P>;
   /** Return the ChannelSections owned by the specified channel ID. */
-  channelId?: string;
-  /**
-   * Return the ChannelSections with the given IDs for Stubby or Apiary.
-   *
-   * Any number of ids: lists longer than 50 are split across calls.
-   */
-  id?: OneOrMany<string>;
+  channelId?: string | undefined;
+  /** Any number of ids: lists longer than 50 are split across calls. */
+  id?: OneOrMany<string> | undefined;
   /** Return the ChannelSections owned by the authenticated user. */
-  mine?: boolean;
+  mine?: boolean | undefined;
 }
 
 /** Parameters of `channelSections.update`. */
 export interface ChannelSectionsUpdateParams<P extends ChannelSectionPart = ChannelSectionPart> extends OnBehalfOfContentOwner {
   /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
   body: Body<ChannelSectionResource>;
 }
@@ -170,49 +170,49 @@ export interface ChannelsListParams<P extends ChannelPart = ChannelPart> extends
    */
   part: OneOrMany<P>;
   /** Return the channels within the specified guide category ID. */
-  categoryId?: string;
+  categoryId?: string | undefined;
   /** Return the channel associated with a YouTube handle. */
-  forHandle?: string;
+  forHandle?: string | undefined;
   /** Return the channel associated with a YouTube username. */
-  forUsername?: string;
+  forUsername?: string | undefined;
   /**
    * Stands for "host language". Specifies the localization language of the metadata to be filled into
    * snippet.localized. The field is filled with the default metadata if there is no localization in
    * the specified language. The parameter value must be a language code included in the list returned
    * by the i18nLanguages.list method (e.g. en_US, es_MX).
    */
-  hl?: string;
+  hl?: string | undefined;
   /**
    * Return the channels with the specified IDs.
    *
    * Any number of ids: lists longer than 50 are split across calls.
    */
-  id?: OneOrMany<string>;
+  id?: OneOrMany<string> | undefined;
   /** Return the channels managed by the authenticated user. */
-  managedByMe?: boolean;
+  managedByMe?: boolean | undefined;
   /**
    * The `maxResults` parameter specifies the maximum number of items that should be returned in the
    * result set.
    *
    * Between 0 and 50. Default 5.
    */
-  maxResults?: number;
+  maxResults?: number | undefined;
   /** Return the ids of channels owned by the authenticated user. */
-  mine?: boolean;
+  mine?: boolean | undefined;
   /** Return the channels subscribed to the authenticated user. */
-  mySubscribers?: boolean;
+  mySubscribers?: boolean | undefined;
   /**
    * The `pageToken` parameter identifies a specific page in the result set that should be returned. In
    * an API response, the nextPageToken and prevPageToken properties identify other pages that could be
    * retrieved.
    */
-  pageToken?: string;
+  pageToken?: string | undefined;
 }
 
 /** Parameters of `channels.update`. */
 export interface ChannelsUpdateParams<P extends ChannelPart = ChannelPart> extends OnBehalfOfContentOwner {
   /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
   body: Body<ChannelResource>;
 }
@@ -220,7 +220,7 @@ export interface ChannelsUpdateParams<P extends ChannelPart = ChannelPart> exten
 /** Parameters of `commentThreads.insert`. */
 export interface CommentThreadsInsertParams<P extends CommentThreadPart = CommentThreadPart> {
   /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
   body: Body<CommentThreadResource>;
 }
@@ -233,59 +233,51 @@ export interface CommentThreadsListParams<P extends CommentThreadPart = CommentT
    */
   part: OneOrMany<P>;
   /** Returns the comment threads of all videos of the channel and the channel comments as well. */
-  allThreadsRelatedToChannelId?: string;
+  allThreadsRelatedToChannelId?: string | undefined;
   /**
    * Returns the comment threads for all the channel comments (ie does not include comments left on
    * videos).
    */
-  channelId?: string;
-  /**
-   * Returns the comment threads with the given IDs for Stubby or Apiary.
-   *
-   * Any number of ids: lists longer than 50 are split across calls.
-   */
-  id?: OneOrMany<string>;
+  channelId?: string | undefined;
+  /** Any number of ids: lists longer than 50 are split across calls. */
+  id?: OneOrMany<string> | undefined;
   /**
    * The `maxResults` parameter specifies the maximum number of items that should be returned in the
    * result set.
    *
    * Between 1 and 100. Default 20.
    */
-  maxResults?: number;
+  maxResults?: number | undefined;
   /**
-   * Limits the returned comment threads to those with the specified moderation status. Not compatible
-   * with the 'id' filter. Valid values: published, heldForReview, likelySpam.
-   *
-   * - `published`: The comment is available for public display.
-   * - `heldForReview`: The comment is awaiting review by a moderator.
-   * - `rejected`: The comment is unfit for display.
+   * Only threads in this moderation state. `heldForReview` and `likelySpam` are only visible to the
+   * owner of the channel or video. Default `published`.
    */
-  moderationStatus?: "published" | "heldForReview" | "likelySpam" | "rejected";
+  moderationStatus?: "published" | "heldForReview" | "likelySpam" | undefined;
   /**
    * - `time`: Order by time.
    * - `relevance`: Order by relevance.
    */
-  order?: "time" | "relevance";
+  order?: "time" | "relevance" | undefined;
   /**
    * The `pageToken` parameter identifies a specific page in the result set that should be returned. In
    * an API response, the nextPageToken and prevPageToken properties identify other pages that could be
    * retrieved.
    */
-  pageToken?: string;
+  pageToken?: string | undefined;
   /**
    * Limits the returned comment threads to those matching the specified key words. Not compatible with
    * the 'id' filter.
    */
-  searchTerms?: string;
+  searchTerms?: string | undefined;
   /**
    * The requested text format for the returned comments.
    *
    * - `html`: Returns the comments in HTML format. This is the default value.
    * - `plainText`: Returns the comments in plain text format.
    */
-  textFormat?: "html" | "plainText";
+  textFormat?: "html" | "plainText" | undefined;
   /** Returns the comment threads of the specified video. */
-  videoId?: string;
+  videoId?: string | undefined;
 }
 
 /** Parameters of `comments.delete`. */
@@ -296,7 +288,7 @@ export interface CommentsDeleteParams {
 /** Parameters of `comments.insert`. */
 export interface CommentsInsertParams<P extends CommentPart = CommentPart> {
   /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
   body: Body<CommentResource>;
 }
@@ -308,38 +300,34 @@ export interface CommentsListParams<P extends CommentPart = CommentPart> {
    * result.
    */
   part: OneOrMany<P>;
-  /**
-   * Returns the comments with the given IDs for One Platform.
-   *
-   * Any number of ids: lists longer than 50 are split across calls.
-   */
-  id?: OneOrMany<string>;
+  /** Any number of ids: lists longer than 50 are split across calls. */
+  id?: OneOrMany<string> | undefined;
   /**
    * The `maxResults` parameter specifies the maximum number of items that should be returned in the
    * result set.
    *
    * Between 1 and 100. Default 20.
    */
-  maxResults?: number;
+  maxResults?: number | undefined;
   /**
    * The `pageToken` parameter identifies a specific page in the result set that should be returned. In
    * an API response, the nextPageToken and prevPageToken properties identify other pages that could be
    * retrieved.
    */
-  pageToken?: string;
+  pageToken?: string | undefined;
   /**
    * Returns replies to the specified comment. Note, currently YouTube features only one level of
    * replies (ie replies to top level comments). However replies to replies may be supported in the
    * future.
    */
-  parentId?: string;
+  parentId?: string | undefined;
   /**
    * The requested text format for the returned comments.
    *
    * - `html`: Returns the comments in HTML format. This is the default value.
    * - `plainText`: Returns the comments in plain text format.
    */
-  textFormat?: "html" | "plainText";
+  textFormat?: "html" | "plainText" | undefined;
 }
 
 /** Parameters of `comments.markAsSpam`. */
@@ -353,29 +341,24 @@ export interface CommentsSetModerationStatusParams {
   /** Modifies the moderation status of the comments with the given IDs. */
   id: OneOrMany<string>;
   /**
-   * Specifies the requested moderation status. Note, comments can be in statuses, which are not
-   * available through this call. For example, this call does not allow to mark a comment as 'likely
-   * spam'. Valid values: 'heldForReview', 'published' or 'rejected'.
-   *
-   * - `published`: The comment is available for public display.
-   * - `heldForReview`: The comment is awaiting review by a moderator.
-   * - `rejected`: The comment is unfit for display.
+   * The status to give the comments: `published` shows them, `heldForReview` hides them until a
+   * moderator decides, `rejected` removes them from view.
    */
-  moderationStatus: "published" | "heldForReview" | "likelySpam" | "rejected";
+  moderationStatus: "published" | "heldForReview" | "rejected";
   /**
    * If set to true the author of the comment gets added to the ban list. This means all future
-   * comments of the author will autmomatically be rejected. Only valid in combination with
+   * comments of the author will automatically be rejected. Only valid in combination with
    * STATUS_REJECTED.
    *
    * Default false.
    */
-  banAuthor?: boolean;
+  banAuthor?: boolean | undefined;
 }
 
 /** Parameters of `comments.update`. */
 export interface CommentsUpdateParams<P extends CommentPart = CommentPart> {
   /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
   body: Body<CommentResource>;
 }
@@ -387,7 +370,7 @@ export interface I18nLanguagesListParams<P extends I18nLanguagePart = I18nLangua
    * result.
    */
   part: OneOrMany<P>;
-  hl?: string;
+  hl?: string | undefined;
 }
 
 /** Parameters of `i18nRegions.list`. */
@@ -397,17 +380,17 @@ export interface I18nRegionsListParams<P extends I18nRegionPart = I18nRegionPart
    * result.
    */
   part: OneOrMany<P>;
-  hl?: string;
+  hl?: string | undefined;
 }
 
 /** Parameters of `liveBroadcasts.bind`. */
 export interface LiveBroadcastsBindParams<P extends LiveBroadcastPart = LiveBroadcastPart> extends OnBehalfOfContentOwnerChannel {
-  /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
+  /** Parts the response returns. The response type follows this list. */
   part: OneOrMany<P>;
   /** Broadcast to bind to the stream. */
   id: string;
   /** Stream to bind, if not set unbind the current one. */
-  streamId?: string;
+  streamId?: string | undefined;
 }
 
 /** Parameters of `liveBroadcasts.delete`. */
@@ -419,7 +402,7 @@ export interface LiveBroadcastsDeleteParams extends OnBehalfOfContentOwnerChanne
 /** Parameters of `liveBroadcasts.insert`. */
 export interface LiveBroadcastsInsertParams<P extends LiveBroadcastPart = LiveBroadcastPart> extends OnBehalfOfContentOwnerChannel {
   /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
   body: Body<LiveBroadcastResource>;
 }
@@ -431,7 +414,7 @@ export interface LiveBroadcastsInsertCuepointParams extends OnBehalfOfContentOwn
    * properties that the API response will include. The part names that you can include in the
    * parameter value are id, snippet, contentDetails, and status.
    */
-  part?: OneOrMany<string>;
+  part?: OneOrMany<string> | undefined;
   /** Broadcast to insert ads to, or equivalently `external_video_id` for internal use. */
   id: string;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
@@ -453,7 +436,7 @@ export interface LiveBroadcastsListParams<P extends LiveBroadcastPart = LiveBroa
    * - `upcoming`: Return broadcasts that have not yet started.
    * - `completed`: Return broadcasts that have already ended.
    */
-  broadcastStatus?: "all" | "active" | "upcoming" | "completed";
+  broadcastStatus?: "all" | "active" | "upcoming" | "completed" | undefined;
   /**
    * Return only broadcasts with the selected type.
    *
@@ -461,39 +444,32 @@ export interface LiveBroadcastsListParams<P extends LiveBroadcastPart = LiveBroa
    * - `event`: Return only scheduled event broadcasts.
    * - `persistent`: Return only persistent broadcasts.
    */
-  broadcastType?: "all" | "event" | "persistent";
-  /**
-   * Return broadcasts with the given ids from Stubby or Apiary.
-   *
-   * Any number of ids: lists longer than 50 are split across calls.
-   */
-  id?: OneOrMany<string>;
+  broadcastType?: "all" | "event" | "persistent" | undefined;
+  /** Any number of ids: lists longer than 50 are split across calls. */
+  id?: OneOrMany<string> | undefined;
   /**
    * The `maxResults` parameter specifies the maximum number of items that should be returned in the
    * result set.
    *
    * Between 0 and 50. Default 5.
    */
-  maxResults?: number;
-  mine?: boolean;
+  maxResults?: number | undefined;
+  mine?: boolean | undefined;
   /**
    * The `pageToken` parameter identifies a specific page in the result set that should be returned. In
    * an API response, the nextPageToken and prevPageToken properties identify other pages that could be
    * retrieved.
    */
-  pageToken?: string;
+  pageToken?: string | undefined;
 }
 
 /** Parameters of `liveBroadcasts.transition`. */
 export interface LiveBroadcastsTransitionParams<P extends LiveBroadcastPart = LiveBroadcastPart> extends OnBehalfOfContentOwnerChannel {
-  /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
+  /** Parts the response returns. The response type follows this list. */
   part: OneOrMany<P>;
   /**
-   * The status to which the broadcast is going to transition.
-   *
-   * - `testing`: Start testing the broadcast. YouTube transmits video to the broadcast's monitor stream. Note that you can only transition a broadcast to the testing state if its contentDetails.monitorStream.enableMonitorStream property is set to true.",.
-   * - `live`: Return only persistent broadcasts.
-   * - `complete`: The broadcast is over. YouTube stops transmitting video.
+   * Where to move the broadcast: `testing` shows it to you only, `live` shows it to its audience,
+   * `complete` ends it.
    */
   broadcastStatus: "testing" | "live" | "complete";
   /** Broadcast to transition. */
@@ -503,7 +479,7 @@ export interface LiveBroadcastsTransitionParams<P extends LiveBroadcastPart = Li
 /** Parameters of `liveBroadcasts.update`. */
 export interface LiveBroadcastsUpdateParams<P extends LiveBroadcastPart = LiveBroadcastPart> extends OnBehalfOfContentOwnerChannel {
   /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
   body: Body<LiveBroadcastResource>;
 }
@@ -516,7 +492,7 @@ export interface LiveChatBansDeleteParams {
 /** Parameters of `liveChatBans.insert`. */
 export interface LiveChatBansInsertParams<P extends LiveChatBanPart = LiveChatBanPart> {
   /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
   body: Body<LiveChatBanResource>;
 }
@@ -529,7 +505,7 @@ export interface LiveChatMessagesDeleteParams {
 /** Parameters of `liveChatMessages.insert`. */
 export interface LiveChatMessagesInsertParams<P extends LiveChatMessagePart = LiveChatMessagePart> {
   /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
   body: Body<LiveChatMessageResource>;
 }
@@ -544,25 +520,25 @@ export interface LiveChatMessagesListParams<P extends LiveChatMessagePart = Live
   /** The id of the live chat for which comments should be returned. */
   liveChatId: string;
   /** Specifies the localization language in which the system messages should be returned. */
-  hl?: string;
+  hl?: string | undefined;
   /**
    * The `maxResults` parameter specifies the maximum number of items that should be returned in the
    * result set. Not used in the streaming RPC.
    *
    * Between 200 and 2000. Default 500.
    */
-  maxResults?: number;
+  maxResults?: number | undefined;
   /**
    * The `pageToken` parameter identifies a specific page in the result set that should be returned. In
    * an API response, the nextPageToken property identify other pages that could be retrieved.
    */
-  pageToken?: string;
+  pageToken?: string | undefined;
   /**
    * Specifies the size of the profile image that should be returned for each user.
    *
    * Between 16 and 720.
    */
-  profileImageSize?: number;
+  profileImageSize?: number | undefined;
 }
 
 /** Parameters of `liveChatMessages.transition`. */
@@ -585,7 +561,7 @@ export interface LiveChatModeratorsDeleteParams {
 /** Parameters of `liveChatModerators.insert`. */
 export interface LiveChatModeratorsInsertParams<P extends LiveChatModeratorPart = LiveChatModeratorPart> {
   /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
   body: Body<LiveChatModeratorResource>;
 }
@@ -605,13 +581,13 @@ export interface LiveChatModeratorsListParams<P extends LiveChatModeratorPart = 
    *
    * Between 0 and 50. Default 5.
    */
-  maxResults?: number;
+  maxResults?: number | undefined;
   /**
    * The `pageToken` parameter identifies a specific page in the result set that should be returned. In
    * an API response, the nextPageToken and prevPageToken properties identify other pages that could be
    * retrieved.
    */
-  pageToken?: string;
+  pageToken?: string | undefined;
 }
 
 /** Parameters of `liveStreams.delete`. */
@@ -622,7 +598,7 @@ export interface LiveStreamsDeleteParams extends OnBehalfOfContentOwnerChannel {
 /** Parameters of `liveStreams.insert`. */
 export interface LiveStreamsInsertParams<P extends LiveStreamPart = LiveStreamPart> extends OnBehalfOfContentOwnerChannel {
   /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
   body: Body<LiveStreamResource>;
 }
@@ -634,32 +610,28 @@ export interface LiveStreamsListParams<P extends LiveStreamPart = LiveStreamPart
    * result.
    */
   part: OneOrMany<P>;
-  /**
-   * Return LiveStreams with the given ids from Stubby or Apiary.
-   *
-   * Any number of ids: lists longer than 50 are split across calls.
-   */
-  id?: OneOrMany<string>;
+  /** Any number of ids: lists longer than 50 are split across calls. */
+  id?: OneOrMany<string> | undefined;
   /**
    * The `maxResults` parameter specifies the maximum number of items that should be returned in the
    * result set.
    *
    * Between 0 and 50. Default 5.
    */
-  maxResults?: number;
-  mine?: boolean;
+  maxResults?: number | undefined;
+  mine?: boolean | undefined;
   /**
    * The `pageToken` parameter identifies a specific page in the result set that should be returned. In
    * an API response, the nextPageToken and prevPageToken properties identify other pages that could be
    * retrieved.
    */
-  pageToken?: string;
+  pageToken?: string | undefined;
 }
 
 /** Parameters of `liveStreams.update`. */
 export interface LiveStreamsUpdateParams<P extends LiveStreamPart = LiveStreamPart> extends OnBehalfOfContentOwnerChannel {
   /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
   body: Body<LiveStreamResource>;
 }
@@ -675,29 +647,29 @@ export interface MembersListParams<P extends MemberPart = MemberPart> {
    * Comma separated list of channel IDs. Only data about members that are part of this list will be
    * included in the response.
    */
-  filterByMemberChannelId?: string;
+  filterByMemberChannelId?: string | undefined;
   /** Filter members in the results set to the ones that have access to a level. */
-  hasAccessToLevel?: string;
+  hasAccessToLevel?: string | undefined;
   /**
    * The `maxResults` parameter specifies the maximum number of items that should be returned in the
    * result set.
    *
    * Between 0 and 1000. Default 5.
    */
-  maxResults?: number;
+  maxResults?: number | undefined;
   /**
    * Parameter that specifies which channel members to return.
    *
    * - `updates`: Return only members that joined after the first call with this mode was made.
    * - `all_current`: Return all current members, from newest to oldest.
    */
-  mode?: "updates" | "all_current";
+  mode?: "updates" | "all_current" | undefined;
   /**
    * The `pageToken` parameter identifies a specific page in the result set that should be returned. In
    * an API response, the nextPageToken and prevPageToken properties identify other pages that could be
    * retrieved.
    */
-  pageToken?: string;
+  pageToken?: string | undefined;
 }
 
 /** Parameters of `membershipsLevels.list`. */
@@ -718,7 +690,7 @@ export interface PlaylistImagesDeleteParams extends OnBehalfOfContentOwner {
 /** Parameters of `playlistImages.insert`. */
 export interface PlaylistImagesInsertParams<P extends PlaylistImagePart = PlaylistImagePart> extends OnBehalfOfContentOwnerChannel {
   /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
   body: Body<PlaylistImageResource>;
   /**
@@ -734,7 +706,7 @@ export interface PlaylistImagesListParams<P extends PlaylistImagePart = Playlist
    * Parts to return. The response type follows this list: a part you did not ask for is not on the
    * result.
    */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** Return PlaylistImages for this playlist id. */
   parent: string;
   /**
@@ -743,26 +715,26 @@ export interface PlaylistImagesListParams<P extends PlaylistImagePart = Playlist
    *
    * Between 0 and 50. Default 5.
    */
-  maxResults?: number;
+  maxResults?: number | undefined;
   /**
    * The `pageToken` parameter identifies a specific page in the result set that should be returned. In
    * an API response, the nextPageToken and prevPageToken properties identify other pages that could be
    * retrieved.
    */
-  pageToken?: string;
+  pageToken?: string | undefined;
 }
 
 /** Parameters of `playlistImages.update`. */
 export interface PlaylistImagesUpdateParams<P extends PlaylistImagePart = PlaylistImagePart> extends OnBehalfOfContentOwner {
   /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
   body: Body<PlaylistImageResource>;
   /**
    * The file to upload: a Blob, bytes, a stream, or `{ body, mimeType, onProgress }` for more control.
    * Accepted types: image/jpeg, image/png, application/octet-stream.
    */
-  media?: MediaInput;
+  media?: MediaInput | undefined;
 }
 
 /** Parameters of `playlistItems.delete`. */
@@ -773,7 +745,7 @@ export interface PlaylistItemsDeleteParams extends OnBehalfOfContentOwner {
 /** Parameters of `playlistItems.insert`. */
 export interface PlaylistItemsInsertParams<P extends PlaylistItemPart = PlaylistItemPart> extends OnBehalfOfContentOwner {
   /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
   body: Body<PlaylistItemResource>;
 }
@@ -786,30 +758,30 @@ export interface PlaylistItemsListParams<P extends PlaylistItemPart = PlaylistIt
    */
   part: OneOrMany<P>;
   /** Any number of ids: lists longer than 50 are split across calls. */
-  id?: OneOrMany<string>;
+  id?: OneOrMany<string> | undefined;
   /**
    * The `maxResults` parameter specifies the maximum number of items that should be returned in the
    * result set.
    *
    * Between 0 and 50. Default 5.
    */
-  maxResults?: number;
+  maxResults?: number | undefined;
   /**
    * The `pageToken` parameter identifies a specific page in the result set that should be returned. In
    * an API response, the nextPageToken and prevPageToken properties identify other pages that could be
    * retrieved.
    */
-  pageToken?: string;
+  pageToken?: string | undefined;
   /** Return the playlist items within the given playlist. */
-  playlistId?: string;
+  playlistId?: string | undefined;
   /** Return the playlist items associated with the given video ID. */
-  videoId?: string;
+  videoId?: string | undefined;
 }
 
 /** Parameters of `playlistItems.update`. */
 export interface PlaylistItemsUpdateParams<P extends PlaylistItemPart = PlaylistItemPart> extends OnBehalfOfContentOwner {
   /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
   body: Body<PlaylistItemResource>;
 }
@@ -822,7 +794,7 @@ export interface PlaylistsDeleteParams extends OnBehalfOfContentOwner {
 /** Parameters of `playlists.insert`. */
 export interface PlaylistsInsertParams<P extends PlaylistPart = PlaylistPart> extends OnBehalfOfContentOwnerChannel {
   /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
   body: Body<PlaylistResource>;
 }
@@ -835,36 +807,32 @@ export interface PlaylistsListParams<P extends PlaylistPart = PlaylistPart> exte
    */
   part: OneOrMany<P>;
   /** Return the playlists owned by the specified channel ID. */
-  channelId?: string;
+  channelId?: string | undefined;
   /** Return content in specified language. */
-  hl?: string;
-  /**
-   * Return the playlists with the given IDs for Stubby or Apiary.
-   *
-   * Any number of ids: lists longer than 50 are split across calls.
-   */
-  id?: OneOrMany<string>;
+  hl?: string | undefined;
+  /** Any number of ids: lists longer than 50 are split across calls. */
+  id?: OneOrMany<string> | undefined;
   /**
    * The `maxResults` parameter specifies the maximum number of items that should be returned in the
    * result set.
    *
    * Between 0 and 50. Default 5.
    */
-  maxResults?: number;
+  maxResults?: number | undefined;
   /** Return the playlists owned by the authenticated user. */
-  mine?: boolean;
+  mine?: boolean | undefined;
   /**
    * The `pageToken` parameter identifies a specific page in the result set that should be returned. In
    * an API response, the nextPageToken and prevPageToken properties identify other pages that could be
    * retrieved.
    */
-  pageToken?: string;
+  pageToken?: string | undefined;
 }
 
 /** Parameters of `playlists.update`. */
 export interface PlaylistsUpdateParams<P extends PlaylistPart = PlaylistPart> extends OnBehalfOfContentOwner {
   /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
   body: Body<PlaylistResource>;
 }
@@ -876,15 +844,15 @@ export interface SearchListParams<P extends SearchResultPart = SearchResultPart>
    * result.
    */
   part: OneOrMany<P>;
-  /** Filter on resources belonging to this channelId. (Force TAP rebuild) */
-  channelId?: string;
+  /** Filter on resources belonging to this channelId. */
+  channelId?: string | undefined;
   /**
    * Add a filter on the channel search.
    *
    * - `any`: Return all channels.
    * - `show`: Only retrieve shows.
    */
-  channelType?: "any" | "show";
+  channelType?: "any" | "show" | undefined;
   /**
    * Filter on the livestream status of the videos.
    *
@@ -893,27 +861,27 @@ export interface SearchListParams<P extends SearchResultPart = SearchResultPart>
    * - `live`: The live broadcast is active.
    * - `completed`: The live broadcast has been completed.
    */
-  eventType?: "none" | "upcoming" | "live" | "completed";
+  eventType?: "none" | "upcoming" | "live" | "completed" | undefined;
   /** Search owned by a content owner. */
-  forContentOwner?: boolean;
+  forContentOwner?: boolean | undefined;
   /**
    * Restrict the search to only retrieve videos uploaded using the project id of the authenticated
    * user.
    */
-  forDeveloper?: boolean;
+  forDeveloper?: boolean | undefined;
   /** Search for the private videos of the authenticated user. */
-  forMine?: boolean;
+  forMine?: boolean | undefined;
   /** Filter on location of the video. */
-  location?: string;
+  location?: string | undefined;
   /** Filter on distance from the location (specified above). */
-  locationRadius?: string;
+  locationRadius?: string | undefined;
   /**
    * The `maxResults` parameter specifies the maximum number of items that should be returned in the
    * result set.
    *
    * Between 0 and 50. Default 5.
    */
-  maxResults?: number;
+  maxResults?: number | undefined;
   /**
    * Sort order of the results.
    *
@@ -924,23 +892,23 @@ export interface SearchListParams<P extends SearchResultPart = SearchResultPart>
    * - `title`: Resources are sorted alphabetically by title.
    * - `videoCount`: Channels are sorted in descending order of their number of uploaded videos.
    */
-  order?: "date" | "rating" | "viewCount" | "relevance" | "title" | "videoCount";
+  order?: "date" | "rating" | "viewCount" | "relevance" | "title" | "videoCount" | undefined;
   /**
    * The `pageToken` parameter identifies a specific page in the result set that should be returned. In
    * an API response, the nextPageToken and prevPageToken properties identify other pages that could be
    * retrieved.
    */
-  pageToken?: string;
+  pageToken?: string | undefined;
   /** Filter on resources published after this date. */
-  publishedAfter?: string | Date;
+  publishedAfter?: string | Date | undefined;
   /** Filter on resources published before this date. */
-  publishedBefore?: string | Date;
+  publishedBefore?: string | Date | undefined;
   /** Textual search terms to match. */
-  q?: string;
+  q?: string | undefined;
   /** Display the content as seen by viewers in this country. */
-  regionCode?: string;
+  regionCode?: string | undefined;
   /** Return results relevant to this language. */
-  relevanceLanguage?: string;
+  relevanceLanguage?: string | undefined;
   /**
    * Indicates whether the search results should include restricted content as well as standard
    * content.
@@ -949,11 +917,10 @@ export interface SearchListParams<P extends SearchResultPart = SearchResultPart>
    * - `moderate`: YouTube will filter some content from search results and, at the least, will filter content that is restricted in your locale. Based on their content, search results could be removed from search results or demoted in search results. This is the default parameter value.
    * - `strict`: YouTube will try to exclude all restricted content from the search result set. Based on their content, search results could be removed from search results or demoted in search results.
    */
-  safeSearch?: "none" | "moderate" | "strict";
+  safeSearch?: "none" | "moderate" | "strict" | undefined;
   /** Restrict results to a particular topic. */
-  topicId?: string;
-  /** Restrict results to a particular set of resource types from One Platform. */
-  type?: OneOrMany<"video" | "channel" | "playlist">;
+  topicId?: string | undefined;
+  type?: OneOrMany<"video" | "channel" | "playlist"> | undefined;
   /**
    * Filter on the presence of captions on the videos.
    *
@@ -961,9 +928,9 @@ export interface SearchListParams<P extends SearchResultPart = SearchResultPart>
    * - `closedCaption`: Only include videos that have captions.
    * - `none`: Only include videos that do not have captions.
    */
-  videoCaption?: "any" | "closedCaption" | "none";
+  videoCaption?: "any" | "closedCaption" | "none" | undefined;
   /** Filter on videos in a specific category. */
-  videoCategoryId?: string;
+  videoCategoryId?: string | undefined;
   /**
    * Filter on the definition of the videos.
    *
@@ -971,7 +938,7 @@ export interface SearchListParams<P extends SearchResultPart = SearchResultPart>
    * - `standard`: Only retrieve videos in standard definition.
    * - `high`: Only retrieve HD videos.
    */
-  videoDefinition?: "any" | "standard" | "high";
+  videoDefinition?: "any" | "standard" | "high" | undefined;
   /**
    * Filter on 3d videos.
    *
@@ -979,7 +946,7 @@ export interface SearchListParams<P extends SearchResultPart = SearchResultPart>
    * - `2d`: Restrict search results to exclude 3D videos.
    * - `3d`: Restrict search results to only include 3D videos.
    */
-  videoDimension?: "any" | "2d" | "3d";
+  videoDimension?: "any" | "2d" | "3d" | undefined;
   /**
    * Filter on the duration of the videos.
    *
@@ -988,14 +955,14 @@ export interface SearchListParams<P extends SearchResultPart = SearchResultPart>
    * - `medium`: Only include videos that are between four and 20 minutes long (inclusive).
    * - `long`: Only include videos longer than 20 minutes.
    */
-  videoDuration?: "any" | "short" | "medium" | "long";
+  videoDuration?: "any" | "short" | "medium" | "long" | undefined;
   /**
    * Filter on embeddable videos.
    *
    * - `any`: Return all videos, embeddable or not.
    * - `true`: Only retrieve embeddable videos.
    */
-  videoEmbeddable?: "any" | "true";
+  videoEmbeddable?: "any" | "true" | undefined;
   /**
    * Filter on the license of the videos.
    *
@@ -1003,19 +970,19 @@ export interface SearchListParams<P extends SearchResultPart = SearchResultPart>
    * - `youtube`: Only return videos that have the standard YouTube license.
    * - `creativeCommon`: Only return videos that have a Creative Commons license. Users can reuse videos with this license in other videos that they create. Learn more.
    */
-  videoLicense?: "any" | "youtube" | "creativeCommon";
+  videoLicense?: "any" | "youtube" | "creativeCommon" | undefined;
   /**
    * - `any`: Return all videos, paid product placement or not.
    * - `true`: Restrict results to only videos with paid product placement.
    */
-  videoPaidProductPlacement?: "any" | "true";
+  videoPaidProductPlacement?: "any" | "true" | undefined;
   /**
    * Filter on syndicated videos.
    *
    * - `any`: Return all videos, syndicated or not.
    * - `true`: Only retrieve syndicated videos.
    */
-  videoSyndicated?: "any" | "true";
+  videoSyndicated?: "any" | "true" | undefined;
   /**
    * Filter on videos of a specific type.
    *
@@ -1023,7 +990,7 @@ export interface SearchListParams<P extends SearchResultPart = SearchResultPart>
    * - `movie`: Only retrieve movies.
    * - `episode`: Only retrieve episodes of shows.
    */
-  videoType?: "any" | "movie" | "episode";
+  videoType?: "any" | "movie" | "episode" | undefined;
 }
 
 /** Parameters of `subscriptions.delete`. */
@@ -1034,7 +1001,7 @@ export interface SubscriptionsDeleteParams {
 /** Parameters of `subscriptions.insert`. */
 export interface SubscriptionsInsertParams<P extends SubscriptionPart = SubscriptionPart> {
   /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
   body: Body<SubscriptionResource>;
 }
@@ -1047,30 +1014,27 @@ export interface SubscriptionsListParams<P extends SubscriptionPart = Subscripti
    */
   part: OneOrMany<P>;
   /** Return the subscriptions of the given channel owner. */
-  channelId?: string;
+  channelId?: string | undefined;
   /**
    * Return the subscriptions to the subset of these channels that the authenticated user is subscribed
    * to.
    */
-  forChannelId?: string;
-  /**
-   * Return the subscriptions with the given IDs for Stubby or Apiary.
-   *
-   * Any number of ids: lists longer than 50 are split across calls.
-   */
-  id?: OneOrMany<string>;
+  forChannelId?: string | undefined;
+  /** Any number of ids: lists longer than 50 are split across calls. */
+  id?: OneOrMany<string> | undefined;
   /**
    * The `maxResults` parameter specifies the maximum number of items that should be returned in the
    * result set.
    *
    * Between 0 and 50. Default 5.
    */
-  maxResults?: number;
+  maxResults?: number | undefined;
   /** Flag for returning the subscriptions of the authenticated user. */
-  mine?: boolean;
-  myRecentSubscribers?: boolean;
+  mine?: boolean | undefined;
+  /** List the subscribers of the authenticated user's channel, most recent first. */
+  myRecentSubscribers?: boolean | undefined;
   /** Return the subscribers of the given channel owner. */
-  mySubscribers?: boolean;
+  mySubscribers?: boolean | undefined;
   /**
    * The order of the returned subscriptions.
    *
@@ -1078,13 +1042,13 @@ export interface SubscriptionsListParams<P extends SubscriptionPart = Subscripti
    * - `unread`: Sort by order of activity.
    * - `alphabetical`: Sort alphabetically.
    */
-  order?: "relevance" | "unread" | "alphabetical";
+  order?: "relevance" | "unread" | "alphabetical" | undefined;
   /**
    * The `pageToken` parameter identifies a specific page in the result set that should be returned. In
    * an API response, the nextPageToken and prevPageToken properties identify other pages that could be
    * retrieved.
    */
-  pageToken?: string;
+  pageToken?: string | undefined;
 }
 
 /** Parameters of `superChatEvents.list`. */
@@ -1095,26 +1059,26 @@ export interface SuperChatEventsListParams<P extends SuperChatEventPart = SuperC
    */
   part: OneOrMany<P>;
   /** Return rendered funding amounts in specified language. */
-  hl?: string;
+  hl?: string | undefined;
   /**
    * The `maxResults` parameter specifies the maximum number of items that should be returned in the
    * result set.
    *
    * Between 1 and 50. Default 5.
    */
-  maxResults?: number;
+  maxResults?: number | undefined;
   /**
    * The `pageToken` parameter identifies a specific page in the result set that should be returned. In
    * an API response, the nextPageToken and prevPageToken properties identify other pages that could be
    * retrieved.
    */
-  pageToken?: string;
+  pageToken?: string | undefined;
 }
 
 /** Parameters of `thirdPartyLinks.delete`. */
 export interface ThirdPartyLinksDeleteParams {
   /** Do not use. Required for compatibility. */
-  part?: OneOrMany<string>;
+  part?: OneOrMany<string> | undefined;
   /** Delete the partner links with the given linking token. */
   linkingToken: string;
   /**
@@ -1125,17 +1089,17 @@ export interface ThirdPartyLinksDeleteParams {
    */
   type: "channelToStoreLink" | "channelToAffiliateProgramLink";
   /** Channel ID to which changes should be applied, for delegation. */
-  externalChannelId?: string;
+  externalChannelId?: string | undefined;
 }
 
 /** Parameters of `thirdPartyLinks.insert`. */
 export interface ThirdPartyLinksInsertParams<P extends ThirdPartyLinkPart = ThirdPartyLinkPart> {
   /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
   body: Body<ThirdPartyLinkResource>;
   /** Channel ID to which changes should be applied, for delegation. */
-  externalChannelId?: string;
+  externalChannelId?: string | undefined;
 }
 
 /** Parameters of `thirdPartyLinks.list`. */
@@ -1146,31 +1110,30 @@ export interface ThirdPartyLinksListParams<P extends ThirdPartyLinkPart = ThirdP
    */
   part: OneOrMany<P>;
   /** Channel ID to which changes should be applied, for delegation. */
-  externalChannelId?: string;
+  externalChannelId?: string | undefined;
   /** Get a third party link with the given linking token. */
-  linkingToken?: string;
+  linkingToken?: string | undefined;
   /**
    * Get a third party link of the given type.
    *
    * - `channelToStoreLink`: A link that is connecting (or about to connect) a channel with a store on a merchandising platform in order to enable retail commerce capabilities for that channel on YouTube.
    * - `channelToAffiliateProgramLink`: A link that is connecting (or about to connect) a channel with an affiliate program of a partner to enable that channel to earn commissions from that partner through affiliate links.
    */
-  type?: "channelToStoreLink" | "channelToAffiliateProgramLink";
+  type?: "channelToStoreLink" | "channelToAffiliateProgramLink" | undefined;
 }
 
 /** Parameters of `thirdPartyLinks.update`. */
 export interface ThirdPartyLinksUpdateParams<P extends ThirdPartyLinkPart = ThirdPartyLinkPart> {
   /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
   body: Body<ThirdPartyLinkResource>;
   /** Channel ID to which changes should be applied, for delegation. */
-  externalChannelId?: string;
+  externalChannelId?: string | undefined;
 }
 
 /** Parameters of `thumbnails.set`. */
 export interface ThumbnailsSetParams extends OnBehalfOfContentOwner {
-  /** Returns the Thumbnail with the given video IDs for Stubby or Apiary. */
   videoId: string;
   /**
    * The file to upload: a Blob, bytes, a stream, or `{ body, mimeType, onProgress }` for more control.
@@ -1186,7 +1149,8 @@ export interface VideoAbuseReportReasonsListParams<P extends VideoAbuseReportRea
    * result.
    */
   part: OneOrMany<P>;
-  hl?: string;
+  /** Language of the labels, for example `fr`. */
+  hl?: string | undefined;
 }
 
 /** Parameters of `videoCategories.list`. */
@@ -1196,14 +1160,12 @@ export interface VideoCategoriesListParams<P extends VideoCategoryPart = VideoCa
    * result.
    */
   part: OneOrMany<P>;
-  hl?: string;
-  /**
-   * Returns the video categories with the given IDs for Stubby or Apiary.
-   *
-   * Any number of ids: lists longer than 50 are split across calls.
-   */
-  id?: OneOrMany<string>;
-  regionCode?: string;
+  /** Language of the category titles, for example `fr`. */
+  hl?: string | undefined;
+  /** Any number of ids: lists longer than 50 are split across calls. */
+  id?: OneOrMany<string> | undefined;
+  /** ISO 3166-1 alpha-2 country code whose categories to list. */
+  regionCode?: string | undefined;
 }
 
 /** Parameters of `videoTrainability.get`. */
@@ -1218,13 +1180,12 @@ export interface VideosBatchGetStatsParams<P extends VideoStatPart = VideoStatPa
    * Parts to return. The response type follows this list: a part you did not ask for is not on the
    * result.
    */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /**
-   * Required. Return videos with the given ids. The number of IDs specified cannot exceed 50.
-   *
-   * Any number of ids: lists longer than 50 are split across calls.
+   * The videos to fetch statistics for. Any number of ids: lists longer than 50 are split across
+   * calls.
    */
-  id?: OneOrMany<string>;
+  id: OneOrMany<string>;
 }
 
 /** Parameters of `videos.delete`. */
@@ -1241,7 +1202,7 @@ export interface VideosGetRatingParams extends OnBehalfOfContentOwner {
 /** Parameters of `videos.insert`. */
 export interface VideosInsertParams<P extends VideoPart = VideoPart> extends OnBehalfOfContentOwnerChannel {
   /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
   body: Body<VideoResource>;
   /**
@@ -1250,15 +1211,15 @@ export interface VideosInsertParams<P extends VideoPart = VideoPart> extends OnB
    */
   media: MediaInput;
   /** Should auto-levels be applied to the upload. */
-  autoLevels?: boolean;
+  autoLevels?: boolean | undefined;
   /**
    * Notify the channel subscribers about the new video. As default, the notification is enabled.
    *
    * Default true.
    */
-  notifySubscribers?: boolean;
+  notifySubscribers?: boolean | undefined;
   /** Should stabilize be applied to the upload. */
-  stabilize?: boolean;
+  stabilize?: boolean | undefined;
 }
 
 /** Parameters of `videos.list`. */
@@ -1273,22 +1234,22 @@ export interface VideosListParams<P extends VideoPart = VideoPart> extends OnBeh
    *
    * - `mostPopular`: Return the most popular videos for the specified content region and video category.
    */
-  chart?: "mostPopular";
+  chart?: "mostPopular" | undefined;
   /**
    * Stands for "host language". Specifies the localization language of the metadata to be filled into
    * snippet.localized. The field is filled with the default metadata if there is no localization in
    * the specified language. The parameter value must be a language code included in the list returned
    * by the i18nLanguages.list method (e.g. en_US, es_MX).
    */
-  hl?: string;
+  hl?: string | undefined;
   /**
    * Return videos with the given ids.
    *
    * Any number of ids: lists longer than 50 are split across calls.
    */
-  id?: OneOrMany<string>;
-  /** Between 72 and 8192. */
-  maxHeight?: number;
+  id?: OneOrMany<string> | undefined;
+  /** Largest height of the embedded player returned in the `player` part. */
+  maxHeight?: number | undefined;
   /**
    * The `maxResults` parameter specifies the maximum number of items that should be returned in the
    * result set. Note: This parameter is supported for use in conjunction with the myRating and chart
@@ -1296,28 +1257,24 @@ export interface VideosListParams<P extends VideoPart = VideoPart> extends OnBeh
    *
    * Between 1 and 50. Default 5.
    */
-  maxResults?: number;
-  /**
-   * Return the player with maximum height specified in.
-   *
-   * Between 72 and 8192.
-   */
-  maxWidth?: number;
+  maxResults?: number | undefined;
+  /** Largest width of the embedded player returned in the `player` part. */
+  maxWidth?: number | undefined;
   /**
    * Return videos liked/disliked by the authenticated user. Does not support RateType.RATED_TYPE_NONE.
    */
-  myRating?: "like" | "dislike";
+  myRating?: "like" | "dislike" | undefined;
   /**
    * The `pageToken` parameter identifies a specific page in the result set that should be returned. In
    * an API response, the nextPageToken and prevPageToken properties identify other pages that could be
    * retrieved. Note: This parameter is supported for use in conjunction with the myRating and chart
    * parameters, but it is not supported for use in conjunction with the id parameter.
    */
-  pageToken?: string;
+  pageToken?: string | undefined;
   /** Use a chart that is specific to the specified region. */
-  regionCode?: string;
+  regionCode?: string | undefined;
   /** Use chart that is specific to the specified video category. */
-  videoCategoryId?: string;
+  videoCategoryId?: string | undefined;
 }
 
 /** Parameters of `videos.rate`. */
@@ -1340,7 +1297,7 @@ export interface VideosReportAbuseParams extends OnBehalfOfContentOwner {
 /** Parameters of `videos.update`. */
 export interface VideosUpdateParams<P extends VideoPart = VideoPart> extends OnBehalfOfContentOwner {
   /** Parts the request writes and the response returns. Defaults to the parts present in `body`. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
   /** The resource to send. Every field is optional in the type, the API checks what it needs. */
   body: Body<VideoResource>;
 }
@@ -1363,33 +1320,33 @@ export interface WatermarksUnsetParams extends OnBehalfOfContentOwner {
 }
 
 /** Parameters of `liveChatMessages.stream`. */
-export interface LiveChatMessagesStreamParams {
+export interface LiveChatMessagesStreamParams<P extends LiveChatMessagePart = LiveChatMessagePart> {
   /**
-   * The `part` parameter specifies the liveChatComment resource parts that the API response will
-   * include. Supported values are id, snippet, and authorDetails.
+   * Parts to return. The response type follows this list: a part you did not ask for is not on the
+   * result.
    */
-  part?: OneOrMany<string>;
+  part?: OneOrMany<P> | undefined;
   /** The id of the live chat for which comments should be returned. */
   liveChatId: string;
   /** Specifies the localization language in which the system messages should be returned. */
-  hl?: string;
+  hl?: string | undefined;
   /**
    * The `maxResults` parameter specifies the maximum number of items that should be returned in the
    * result set. Not used in the streaming RPC.
    *
    * Between 200 and 2000. Default 500.
    */
-  maxResults?: number;
+  maxResults?: number | undefined;
   /**
    * The `pageToken` parameter identifies a specific page in the result set that should be returned. In
    * an API response, the nextPageToken property identify other pages that could be retrieved.
    */
-  pageToken?: string;
+  pageToken?: string | undefined;
   /**
    * Specifies the size of the profile image that should be returned for each user.
    *
    * Between 16 and 720.
    */
-  profileImageSize?: number;
+  profileImageSize?: number | undefined;
 }
 

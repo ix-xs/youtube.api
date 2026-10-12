@@ -41,12 +41,12 @@ export interface WebSubSubscribeOptions {
    * Shared secret. When set, the hub signs every notification and
    * {@link websub.receive} rejects forged ones. Use one: the callback URL is public.
    */
-  secret?: string;
+  secret?: string | undefined;
   /** How long the subscription lasts. The hub caps it at about 10 days; renew before it lapses. Default `"5d"`. */
-  lease?: Duration;
-  signal?: AbortSignal;
+  lease?: Duration | undefined;
+  signal?: AbortSignal | undefined;
   /** Custom `fetch`. */
-  fetch?: typeof fetch;
+  fetch?: typeof fetch | undefined;
 }
 
 /** What {@link websub.receive} read from a request. */
@@ -64,10 +64,12 @@ export interface WebSubResult {
 /** Options of {@link websub.receive}. */
 export interface WebSubReceiveOptions {
   /** The secret given to `subscribe()`. Notifications without a valid signature are dropped. */
-  secret?: string;
+  secret?: string | undefined;
   /**
-   * Decides whether to confirm a subscription the hub asks about. Return
-   * false for a topic you never asked for. Default: confirm everything.
+   * Decides whether to confirm what the hub asks about. Return false for a
+   * topic you never asked for, and for a removal you did not request: anyone
+   * can ask the hub to unsubscribe your callback, and only this check stops
+   * it. Default: confirm everything.
    */
   confirm?: (request: { mode: "subscribe" | "unsubscribe"; topic: string; channelId: string | undefined }) => boolean | Promise<boolean>;
 }
@@ -100,7 +102,7 @@ async function hubRequest(mode: "subscribe" | "unsubscribe", options: WebSubSubs
     throw new YouTubeRequestError(options.signal?.aborted ? "ABORTED" : "NETWORK", `websub.${mode}`, `could not reach the hub (${(cause as Error)?.message ?? cause}).`, { cause });
   }
   const text = await response.text().catch(() => "");
-  if (!response.ok) throw new YouTubeRequestError("NETWORK", `websub.${mode}`, `the hub answered ${response.status}${text ? `: ${text.trim().slice(0, 200)}` : ""}.`);
+  if (!response.ok) throw new YouTubeRequestError("HUB_ERROR", `websub.${mode}`, `the hub answered ${response.status}${text ? `: ${text.trim().slice(0, 200)}` : ""}.`);
 }
 
 function parse(xml: string): WebSubNotification[] {
@@ -154,6 +156,32 @@ async function verify(body: string | Uint8Array, header: string | null | undefin
   return diff === 0;
 }
 
+/** Reads a request body up to the size limit. Resolves to `null` when it is larger. */
+async function readBody(request: Request): Promise<Uint8Array | null> {
+  if (Number(request.headers.get("content-length")) > MAX_BODY) return null;
+  if (!request.body) return new Uint8Array(0);
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_BODY) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
+
 const channelOf = (topic: string): string | undefined => /[?&]channel_id=([\w-]+)/.exec(topic)?.[1];
 
 async function receive(request: Request, options: WebSubReceiveOptions = {}): Promise<WebSubResult> {
@@ -181,17 +209,17 @@ async function receive(request: Request, options: WebSubReceiveOptions = {}): Pr
   if (request.method !== "POST") {
     return { ...empty, response: new Response("Method not allowed.", { status: 405, headers: { allow: "GET, POST" } }) };
   }
-  const body = await request.text();
-  // A notification is a few kilobytes. Anything huge is not one.
-  if (body.length > MAX_BODY) return { ...empty, verified: false, response: new Response("Payload too large.", { status: 413 }) };
+  // A notification is a few kilobytes. Anything huge is not one, and is never held in memory.
+  const bytes = await readBody(request);
+  if (!bytes) return { ...empty, verified: false, response: new Response("Payload too large.", { status: 413 }) };
   if (options.secret) {
     const signature = request.headers.get("x-hub-signature-256") ?? request.headers.get("x-hub-signature");
-    if (!(await verify(body, signature, options.secret))) {
+    if (!(await verify(bytes, signature, options.secret))) {
       // The spec asks for a success status here, so a forger learns nothing.
       return { ...empty, verified: false, response: new Response(null, { status: 202 }) };
     }
   }
-  return { ...empty, notifications: parse(body), response: new Response(null, { status: 204 }) };
+  return { ...empty, notifications: parse(new TextDecoder().decode(bytes)), response: new Response(null, { status: 204 }) };
 }
 
 /**

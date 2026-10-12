@@ -41,11 +41,11 @@ export interface Feed {
 
 /** Options of {@link fetchFeed}. */
 export interface FeedOptions {
-  signal?: AbortSignal;
+  signal?: AbortSignal | undefined;
   /** Default `"15s"`. */
-  timeout?: Duration;
+  timeout?: Duration | undefined;
   /** Custom `fetch`. */
-  fetch?: typeof fetch;
+  fetch?: typeof fetch | undefined;
 }
 
 function number(value: string | undefined): number | undefined {
@@ -135,7 +135,22 @@ export function feedUrl(id: string): string {
  * console.log(feed.title, feed.entries[0]?.title);
  */
 export async function fetchFeed(id: string, options: FeedOptions = {}): Promise<Feed> {
-  const url = feedUrl(id);
+  const response = await get("feed", feedUrl(id), options, { accept: "application/atom+xml, application/xml;q=0.9" });
+  if (!response.ok) {
+    void response.body?.cancel().catch(() => {});
+    throw new YouTubeRequestError(
+      "FEED_UNAVAILABLE",
+      "feed",
+      response.status === 404
+        ? `YouTube answered 404 for the feed of ${id}. Either the id is wrong, or the feed service is having one of its outages.`
+        : `YouTube answered ${response.status} for the feed of ${id}.`,
+    );
+  }
+  return parseFeed(await response.text());
+}
+
+/** One GET with a timeout and the caller's signal, shared by the two key-less endpoints. */
+async function get(method: "feed" | "oembed", url: string | URL, options: FeedOptions, headers: Record<string, string> = {}): Promise<Response> {
   const fetchImpl = options.fetch ?? globalThis.fetch;
   const controller = new AbortController();
   const timeout = toMs(options.timeout ?? "15s");
@@ -145,23 +160,11 @@ export async function fetchFeed(id: string, options: FeedOptions = {}): Promise<
   if (options.signal?.aborted) controller.abort(options.signal.reason);
   else options.signal?.addEventListener("abort", onAbort, { once: true });
   try {
-    const response = await fetchImpl(url, { signal: controller.signal, headers: { accept: "application/atom+xml, application/xml;q=0.9" } });
-    if (!response.ok) {
-      void response.body?.cancel().catch(() => {});
-      throw new YouTubeRequestError(
-        "FEED_UNAVAILABLE",
-        "feed",
-        response.status === 404
-          ? `YouTube answered 404 for the feed of ${id}. Either the id is wrong, or the feed service is having one of its outages.`
-          : `YouTube answered ${response.status} for the feed of ${id}.`,
-      );
-    }
-    return parseFeed(await response.text());
-  } catch (error) {
-    if (error instanceof YouTubeRequestError || error instanceof YouTubeArgumentError) throw error;
-    if (options.signal?.aborted) throw new YouTubeRequestError("ABORTED", "feed", "the request was aborted.", { cause: error });
-    if (timedOut) throw new YouTubeRequestError("TIMEOUT", "feed", `no response after ${timeout} ms.`, { cause: error });
-    throw new YouTubeRequestError("FEED_UNAVAILABLE", "feed", `could not fetch the feed of ${id} (${(error as Error)?.message ?? error}).`, { cause: error });
+    return await fetchImpl(url, { signal: controller.signal, headers });
+  } catch (cause) {
+    if (options.signal?.aborted) throw new YouTubeRequestError("ABORTED", method, "the request was aborted.", { cause });
+    if (timedOut) throw new YouTubeRequestError("TIMEOUT", method, `no response after ${timeout} ms.`, { cause });
+    throw new YouTubeRequestError(method === "feed" ? "FEED_UNAVAILABLE" : "NETWORK", method, `could not reach YouTube (${(cause as Error)?.message ?? cause}).`, { cause });
   } finally {
     clearTimeout(timer);
     options.signal?.removeEventListener("abort", onAbort);
@@ -194,24 +197,18 @@ export interface OEmbed {
  * const info = await oEmbed("https://youtu.be/dQw4w9WgXcQ");
  * console.log(info?.title, info?.authorName);
  */
-export async function oEmbed(url: string, options: FeedOptions & { maxWidth?: number; maxHeight?: number } = {}): Promise<OEmbed | null> {
+export async function oEmbed(url: string, options: FeedOptions & { maxWidth?: number | undefined; maxHeight?: number | undefined } = {}): Promise<OEmbed | null> {
   const endpoint = new URL("https://www.youtube.com/oembed");
   endpoint.searchParams.set("url", /^[\w-]{11}$/.test(url) ? `https://www.youtube.com/watch?v=${url}` : url);
   endpoint.searchParams.set("format", "json");
   if (options.maxWidth) endpoint.searchParams.set("maxwidth", String(options.maxWidth));
   if (options.maxHeight) endpoint.searchParams.set("maxheight", String(options.maxHeight));
-  const fetchImpl = options.fetch ?? globalThis.fetch;
-  let response: Response;
-  try {
-    response = await fetchImpl(endpoint, { signal: options.signal ?? AbortSignal.timeout(toMs(options.timeout ?? "15s")) });
-  } catch (cause) {
-    throw new YouTubeRequestError(options.signal?.aborted ? "ABORTED" : "NETWORK", "oembed", `could not reach YouTube (${(cause as Error)?.message ?? cause}).`, { cause });
-  }
+  const response = await get("oembed", endpoint, options);
   if ([400, 401, 403, 404].includes(response.status)) {
     void response.body?.cancel().catch(() => {});
     return null;
   }
-  if (!response.ok) throw new YouTubeRequestError("NETWORK", "oembed", `YouTube answered ${response.status}.`);
+  if (!response.ok) throw new YouTubeRequestError("SERVER_ERROR", "oembed", `YouTube answered ${response.status}.`);
   const data = (await response.json()) as Record<string, string | number>;
   return {
     title: String(data.title ?? ""),

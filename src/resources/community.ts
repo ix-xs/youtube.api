@@ -2,6 +2,7 @@ import type { YouTube } from "../client.js";
 import { YouTubeArgumentError } from "../core/errors.js";
 import type { ListRequest } from "../core/pagination.js";
 import type { RequestOptions, Rest } from "../core/rest.js";
+import { METHODS } from "../generated/methods.js";
 import type { CommentThreadsListParams, CommentsListParams, SearchListParams } from "../generated/params.js";
 import { CommentThreadsApi, CommentsApi, SearchApi, SubscriptionsApi } from "../generated/resources.js";
 import type {
@@ -40,7 +41,8 @@ function requireVideoId(video: string): string {
  *
  * Search draws from its own quota bucket: 100 calls a day by default. When a
  * cheaper method answers the question (a channel's uploads, a playlist's
- * videos, a video by id), use it.
+ * videos, a video by id), use it. Each helper costs 1 call of that bucket per
+ * page of 50 results. An empty query lists without search terms.
  */
 export class Search extends SearchApi {
   /**
@@ -51,7 +53,7 @@ export class Search extends SearchApi {
    * const videos = await yt.videos.getMany(results.map((result) => result.id.videoId));
    */
   videos(query: string, filters: SearchFilters = {}, options?: RequestOptions): ListRequest<VideoSearchResult, SearchListResponse> {
-    return this.list({ ...filters, part: "snippet", q: query, type: "video" }, options) as ListRequest<VideoSearchResult, SearchListResponse>;
+    return this._list(METHODS["search.list"], { ...filters, part: "snippet", q: query || undefined, type: "video" }, options, true) as ListRequest<VideoSearchResult, SearchListResponse>;
   }
 
   /**
@@ -61,7 +63,7 @@ export class Search extends SearchApi {
    * const [first] = await yt.search.channels("Google for Developers").take(1);
    */
   channels(query: string, filters: SearchFilters = {}, options?: RequestOptions): ListRequest<ChannelSearchResult, SearchListResponse> {
-    return this.list({ ...filters, part: "snippet", q: query, type: "channel" }, options) as ListRequest<ChannelSearchResult, SearchListResponse>;
+    return this._list(METHODS["search.list"], { ...filters, part: "snippet", q: query || undefined, type: "channel" }, options, true) as ListRequest<ChannelSearchResult, SearchListResponse>;
   }
 
   /**
@@ -71,7 +73,7 @@ export class Search extends SearchApi {
    * const playlists = await yt.search.playlists("typescript course").take(5);
    */
   playlists(query: string, filters: SearchFilters = {}, options?: RequestOptions): ListRequest<PlaylistSearchResult, SearchListResponse> {
-    return this.list({ ...filters, part: "snippet", q: query, type: "playlist" }, options) as ListRequest<PlaylistSearchResult, SearchListResponse>;
+    return this._list(METHODS["search.list"], { ...filters, part: "snippet", q: query || undefined, type: "playlist" }, options, true) as ListRequest<PlaylistSearchResult, SearchListResponse>;
   }
 
   /**
@@ -81,7 +83,7 @@ export class Search extends SearchApi {
    * const live = await yt.search.live("speedrun", { channelId }).take(5);
    */
   live(query: string, filters: Omit<SearchFilters, "eventType"> = {}, options?: RequestOptions): ListRequest<VideoSearchResult, SearchListResponse> {
-    return this.list({ ...filters, part: "snippet", q: query, type: "video", eventType: "live" }, options) as ListRequest<VideoSearchResult, SearchListResponse>;
+    return this._list(METHODS["search.list"], { ...filters, part: "snippet", q: query || undefined, type: "video", eventType: "live" }, options, true) as ListRequest<VideoSearchResult, SearchListResponse>;
   }
 }
 
@@ -104,7 +106,7 @@ export class CommentThreads extends CommentThreadsApi {
     options: PartOptions<P> & Pick<CommentThreadsListParams, "order" | "searchTerms" | "textFormat" | "moderationStatus" | "maxResults"> = {},
   ): ListRequest<CommentThread<P>, CommentThreadListResponse> {
     const { part = "snippet" as P, order, searchTerms, textFormat, moderationStatus, maxResults, ...request } = options;
-    return this.list({ part, videoId: requireVideoId(video), order, searchTerms, textFormat, moderationStatus, maxResults } as CommentThreadsListParams<P>, request);
+    return this._list(METHODS["commentThreads.list"], { part, videoId: requireVideoId(video), order, searchTerms, textFormat, moderationStatus, maxResults }, request, true);
   }
 
   /**
@@ -126,6 +128,8 @@ export class Comments extends CommentsApi {
    * Lists every reply to a top-level comment. `commentThreads` only inlines
    * the first five.
    *
+   * Quota: 1 unit per page of 100.
+   *
    * @example
    * const replies = await yt.comments.replies(thread.id).all();
    */
@@ -134,7 +138,7 @@ export class Comments extends CommentsApi {
     options: PartOptions<P> & Pick<CommentsListParams, "textFormat" | "maxResults"> = {},
   ): ListRequest<Comment<P>, CommentListResponse> {
     const { part = "snippet" as P, textFormat, maxResults, ...request } = options;
-    return this.list({ part, parentId, textFormat, maxResults } as CommentsListParams<P>, request);
+    return this._list(METHODS["comments.list"], { part, parentId, textFormat, maxResults }, request, true);
   }
 
   /**
@@ -176,6 +180,8 @@ export class Subscriptions extends SubscriptionsApi {
    * Finds the authenticated user's subscription to a channel, or `null` when
    * they are not subscribed.
    *
+   * Quota: 1 unit, plus 1 to resolve a handle the first time.
+   *
    * @example
    * const subscribed = (await yt.subscriptions.to("@GoogleDevelopers")) !== null;
    */
@@ -187,7 +193,7 @@ export class Subscriptions extends SubscriptionsApi {
   /**
    * Subscribes the authenticated user to a channel.
    *
-   * Quota: 50 units.
+   * Quota: 50 units, plus 1 to resolve a handle the first time.
    *
    * @example
    * await yt.subscriptions.subscribe("@GoogleDevelopers");

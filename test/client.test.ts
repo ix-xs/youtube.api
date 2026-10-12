@@ -220,11 +220,16 @@ describe("errors", () => {
   });
 
   it("waits for Retry-After", async () => {
-    const { yt } = client([apiError(429, "rateLimitExceeded", "slow down", { "retry-after": "0.05" }), list([])]);
+    const { yt } = client([apiError(429, "rateLimitExceeded", "slow down", { "retry-after": "0.05" }), list([])], { retry: { delay: 1, maxDelay: 1000 } });
     const delays: number[] = [];
     yt.on("retry", (event) => delays.push(event.delay));
     await yt.videos.list({ part: "id", id: VIDEO_ID });
     expect(delays).toEqual([50]);
+
+    // Asked to wait longer than allowed: the error comes back at once, with the delay on it.
+    const impatient = client(apiError(429, "rateLimitExceeded", "slow down", { "retry-after": "120" }), { retry: { delay: 1, maxDelay: 1000 } });
+    await expect(impatient.yt.videos.list({ part: "id", id: VIDEO_ID })).rejects.toMatchObject({ code: "RATE_LIMITED", retryAfter: 120 });
+    expect(impatient.calls).toHaveLength(1);
   });
 
   it("times out", async () => {

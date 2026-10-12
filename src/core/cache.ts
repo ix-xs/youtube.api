@@ -25,16 +25,16 @@ export interface CacheStore {
 /** Cache settings of the client. */
 export interface CacheOptions {
   /** How long a response stays fresh. Default `"5m"`. */
-  ttl?: Duration;
+  ttl?: Duration | undefined;
   /** Entries kept by the in-memory store before the oldest is dropped. Default 500. */
-  max?: number;
+  max?: number | undefined;
   /** Custom storage. */
-  store?: CacheStore;
+  store?: CacheStore | undefined;
   /**
    * Fine-grained freshness per method, for example
    * `{ "videoCategories.list": "1d", "search.list": "1h", "videos.list": false }`.
    */
-  methods?: Record<string, Duration | false>;
+  methods?: Record<string, Duration | false> | undefined;
 }
 
 /** In-memory store that drops the least recently used entry once full. */

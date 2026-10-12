@@ -36,7 +36,8 @@ watcher.on("video", async (video) => {
   if (!response.ok) console.warn(`Discord answered ${response.status}`);
 });
 
-watcher.on("error", ({ channel, error }) => console.warn(`Could not check ${channel}:`, error.message));
+// `channel` is empty when the listener above failed (Discord unreachable, for instance).
+watcher.on("error", ({ channel, error }) => console.warn(channel ? `Could not check ${channel}:` : "Could not post to Discord:", error?.message ?? error));
 
 watcher.start();
 console.log(`Watching ${channels.join(", ")}. Ctrl+C to stop.`);

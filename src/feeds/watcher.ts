@@ -26,7 +26,7 @@ export interface WatchedVideo {
 /** Options of a {@link Watcher}. */
 export interface WatcherOptions {
   /** Time between two rounds. Default `"5m"`. */
-  interval?: Duration;
+  interval?: Duration | undefined;
   /**
    * Where to look for new videos.
    *
@@ -35,22 +35,26 @@ export interface WatcherOptions {
    * - `"feed"`: the public feed only. No quota, but YouTube does not guarantee it.
    * - `"api"`: the uploads playlist through the API. 1 unit per channel per round.
    */
-  source?: "auto" | "feed" | "api";
+  source?: "auto" | "feed" | "api" | undefined;
   /**
    * Report videos published after this moment. Default: the moment the
-   * watcher is created, so only uploads from now on. Give the time of your
-   * last run to catch up after a restart.
+   * watcher is created, so only uploads from now on. To catch up after a
+   * restart, give a time a few minutes before your last run (the feed lags
+   * behind uploads) and skip the videos you already handled.
    */
-  since?: Date | string | number;
+  since?: Date | string | number | undefined;
   /** Custom `fetch`, for the feed requests. */
-  fetch?: typeof fetch;
+  fetch?: typeof fetch | undefined;
 }
 
 /** Events of a {@link Watcher}. */
 export interface WatcherEvents {
   /** A new video was found. */
   video: WatchedVideo;
-  /** Checking a channel failed. The watcher keeps going. */
+  /**
+   * Checking a channel failed, or one of your own listeners threw (`channel`
+   * is then empty). The watcher keeps going.
+   */
   error: { channel: string; error: unknown };
   /** A channel was checked. */
   poll: { channel: string; channelId: string; source: "feed" | "api"; found: number };
@@ -60,13 +64,21 @@ interface ChannelState {
   ref: string;
   id: string | undefined;
   seen: Set<string>;
+  /** Videos published before this moment are not news for this channel. */
+  since: number;
+  /** Whether the channel was read once, so what it holds now is known. */
+  primed: boolean;
   /** The feed of this channel failed: until then, the API is asked instead. */
   feedDownUntil: number;
+  /** The reference matched no channel: it is not looked up again before this moment. */
+  missingUntil: number;
 }
 
 /** How long the feed of a channel is left alone after it failed. Outages last hours. */
 const FEED_COOLDOWN = 30 * 60_000;
 const SEEN_LIMIT = 500;
+/** How long a reference that matched no channel is left alone. */
+const MISSING_COOLDOWN = 6 * 3_600_000;
 
 /**
  * Watches channels for new uploads and tells you when one appears. This is
@@ -98,9 +110,10 @@ export class Watcher extends Emitter<WatcherEvents> implements AsyncIterable<Wat
   #timer: ReturnType<typeof setTimeout> | undefined;
   #running = false;
   #checking: Promise<WatchedVideo[]> | undefined;
+  #ready = false;
 
   constructor(channels: readonly string[] = [], options: WatcherOptions = {}, client?: YouTube) {
-    super();
+    super((error) => ({ channel: "", error }));
     this.#client = client;
     this.#interval = toMs(options.interval ?? "5m");
     this.#source = options.source ?? "auto";
@@ -109,6 +122,13 @@ export class Watcher extends Emitter<WatcherEvents> implements AsyncIterable<Wat
     if (Number.isNaN(this.#since)) throw new YouTubeArgumentError("Watcher: `since` is not a valid date.");
     if (this.#source === "api" && !client) throw new YouTubeArgumentError('Watcher: `source: "api"` needs an API client. Create the watcher with yt.watch().');
     for (const channel of channels) this.add(channel);
+    this.#ready = true;
+  }
+
+  /** Channel ids are case-sensitive, handles and URLs are not. */
+  #key(channel: string): string {
+    const trimmed = channel.trim();
+    return isChannelId(trimmed) ? trimmed : trimmed.toLowerCase();
   }
 
   /** The channels being watched, as they were given. */
@@ -123,18 +143,21 @@ export class Watcher extends Emitter<WatcherEvents> implements AsyncIterable<Wat
 
   /** Starts watching another channel. Its current videos are not reported, only later ones. */
   add(channel: string): this {
-    const key = channel.trim().toLowerCase();
+    const key = this.#key(channel);
     if (!key) throw new YouTubeArgumentError("Watcher: empty channel.");
     if (!this.#client && !isChannelId(channel.trim())) {
       throw new YouTubeArgumentError(`Watcher: "${channel}" is not a channel id. Handles and URLs need an API client to be resolved: create the watcher with yt.watch().`);
     }
-    if (!this.#channels.has(key)) this.#channels.set(key, { ref: channel.trim(), id: undefined, seen: new Set(), feedDownUntil: 0 });
+    if (!this.#channels.has(key)) {
+      // A channel given at creation follows `since`; one added later starts from now.
+      this.#channels.set(key, { ref: channel.trim(), id: undefined, seen: new Set(), since: this.#ready ? Date.now() : this.#since, primed: false, feedDownUntil: 0, missingUntil: 0 });
+    }
     return this;
   }
 
-  /** Stops watching a channel. */
+  /** Stops watching a channel. Give it the way it was added: the same id, handle or URL. */
   remove(channel: string): this {
-    this.#channels.delete(channel.trim().toLowerCase());
+    this.#channels.delete(this.#key(channel));
     return this;
   }
 
@@ -191,13 +214,25 @@ export class Watcher extends Emitter<WatcherEvents> implements AsyncIterable<Wat
 
   async #poll(state: ChannelState): Promise<WatchedVideo[]> {
     if (!state.id) {
+      // A reference that matched nothing is reported once, then left alone for
+      // a while: looking it up again every round would spend quota on a typo.
+      if (Date.now() < state.missingUntil) return [];
       const id = isChannelId(state.ref) ? state.ref : await this.#client?.channels.resolveId(state.ref);
-      if (!id) throw new YouTubeArgumentError(`No channel found for "${state.ref}".`);
+      if (!id) {
+        state.missingUntil = Date.now() + MISSING_COOLDOWN;
+        throw new YouTubeArgumentError(`No channel found for "${state.ref}". It will be looked up again in 6 hours.`);
+      }
       state.id = id;
     }
     const { videos, source } = await this.#read(state, state.id);
-    const fresh = videos.filter((video) => !state.seen.has(video.videoId) && Date.parse(video.publishedAt) > this.#since);
+    const fresh = videos.filter((video) => {
+      if (state.seen.has(video.videoId)) return false;
+      const published = Date.parse(video.publishedAt);
+      // Without a usable date, a video is news once the channel's current content is known.
+      return Number.isNaN(published) ? state.primed : published > state.since;
+    });
     for (const video of videos) state.seen.add(video.videoId);
+    state.primed = true;
     if (state.seen.size > SEEN_LIMIT) {
       state.seen = new Set([...state.seen].slice(-SEEN_LIMIT));
     }

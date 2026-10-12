@@ -83,12 +83,12 @@ export type AnalyticsDimension =
   | (string & {});
 
 /** Parameters of {@link Analytics.query}. */
-export interface AnalyticsQuery<M extends string, D extends string> {
+export interface AnalyticsQuery<M extends string, D extends string, S extends M | D | `-${M | D}` = M | D | `-${M | D}`> {
   /**
    * Whose data to report on. Default `"channel==MINE"`, the authenticated
    * user's channel. Content owners use `"contentOwner==NAME"`.
    */
-  ids?: "channel==MINE" | `channel==${string}` | `contentOwner==${string}`;
+  ids?: "channel==MINE" | `channel==${string}` | `contentOwner==${string}` | undefined;
   /** First day of the report, `YYYY-MM-DD` or a Date. Days are in Pacific Time. */
   startDate: string | Date;
   /** Last day of the report, `YYYY-MM-DD` or a Date. */
@@ -96,23 +96,23 @@ export interface AnalyticsQuery<M extends string, D extends string> {
   /** What to measure. */
   metrics: OneOrMany<M>;
   /** How to split the numbers. Without dimensions the report is a single row of totals. */
-  dimensions?: OneOrMany<D>;
+  dimensions?: OneOrMany<D> | undefined;
   /**
    * Restricts the data. An object is the readable form:
    * `{ video: "dQw4w9WgXcQ", country: "FR" }`. An array value means any of.
    * The raw syntax (`"video==dQw4w9WgXcQ;country==FR"`) works too.
    */
-  filters?: string | Record<string, string | readonly string[]>;
-  /** Columns to sort by. Prefix with `-` for descending: `"-views"`. */
-  sort?: OneOrMany<M | D | `-${M | D}`>;
+  filters?: string | Record<string, string | readonly string[]> | undefined;
+  /** Columns to sort by, among the metrics and dimensions of the query. Prefix with `-` for descending: `"-views"`. */
+  sort?: OneOrMany<S> | undefined;
   /** Rows to return at most. Some reports, such as top videos, require it. */
-  maxResults?: number;
+  maxResults?: number | undefined;
   /** 1-based index of the first row, to page through a long report. */
-  startIndex?: number;
+  startIndex?: number | undefined;
   /** Currency of revenue metrics, ISO 4217. Default `USD`. */
-  currency?: string;
+  currency?: string | undefined;
   /** Include data from before the channel was linked to its content owner. */
-  includeHistoricalChannelData?: boolean;
+  includeHistoricalChannelData?: boolean | undefined;
 }
 
 /** A report with its rows turned into objects. */
@@ -142,8 +142,9 @@ function filterString(filters: string | Record<string, string | readonly string[
 }
 
 /**
- * `yt.analytics`: the YouTube Analytics API. Needs OAuth with the
- * `yt-analytics.readonly` scope (`yt-analytics-monetary.readonly` for revenue).
+ * `yt.analytics`: the YouTube Analytics API. Needs OAuth. The usual scope is
+ * `yt-analytics.readonly`, and `yt-analytics-monetary.readonly` for revenue;
+ * the `youtube` scopes are accepted too.
  */
 export class Analytics {
   /** Custom groups of videos, playlists, channels or assets to report on as one. */
@@ -189,7 +190,10 @@ export class Analytics {
    * });
    * @see https://developers.google.com/youtube/analytics/channel_reports
    */
-  async query<M extends AnalyticsMetric, D extends AnalyticsDimension = never>(query: AnalyticsQuery<M, D>, options?: RequestOptions): Promise<AnalyticsReport<M, D>> {
+  async query<M extends AnalyticsMetric, D extends AnalyticsDimension = never, S extends M | D | `-${M | D}` = M | D | `-${M | D}`>(
+    query: AnalyticsQuery<M, D, S>,
+    options?: RequestOptions,
+  ): Promise<AnalyticsReport<M, D>> {
     const raw = await this.#rest.request<AnalyticsQueryResponse>(
       METHODS["analytics.reports.query"],
       {

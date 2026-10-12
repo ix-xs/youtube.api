@@ -1,5 +1,5 @@
 import { Emitter } from "../core/emitter.js";
-import { YouTubeArgumentError, YouTubeAuthError } from "../core/errors.js";
+import { YouTubeArgumentError, YouTubeAuthError, YouTubeRequestError } from "../core/errors.js";
 import { sleep } from "../core/time.js";
 import { type Scope, scopeName, scopeUrl } from "./scopes.js";
 
@@ -30,19 +30,19 @@ export interface OAuth2Options {
   /** Client id of your Google Cloud OAuth client. */
   clientId: string;
   /** Client secret. Leave it out for public clients (browser, mobile, desktop) that use PKCE. */
-  clientSecret?: string;
+  clientSecret?: string | undefined;
   /** Where Google sends the user back after consent. Must match the client's configuration exactly. */
-  redirectUri?: string;
+  redirectUri?: string | undefined;
   /** Tokens saved from a previous session. */
-  tokens?: Tokens;
+  tokens?: Tokens | undefined;
   /**
    * Called whenever tokens change: after an exchange and after each refresh.
    * This is where you persist them. It is awaited, and if it throws, the call
    * that triggered it fails: tokens that could not be saved are not silently lost.
    */
-  onTokens?: (tokens: Tokens) => void | Promise<void>;
+  onTokens?: ((tokens: Tokens) => void | Promise<void>) | undefined;
   /** Custom `fetch`. */
-  fetch?: typeof fetch;
+  fetch?: typeof fetch | undefined;
 }
 
 /** Options of {@link OAuth2.authUrl}. */
@@ -53,25 +53,25 @@ export interface AuthUrlOptions {
    * `"offline"` asks for a refresh token, so the app keeps working when the
    * user is away. Default `"offline"`.
    */
-  accessType?: "offline" | "online";
+  accessType?: "offline" | "online" | undefined;
   /**
    * `"consent"` forces the consent screen, which is what makes Google send a
    * refresh token again for a user who already approved the app.
    */
-  prompt?: "none" | "consent" | "select_account" | "consent select_account";
+  prompt?: "none" | "consent" | "select_account" | "consent select_account" | undefined;
   /** Opaque value echoed back to the redirect URI. Generated when left out; verify it there to block CSRF. */
-  state?: string;
+  state?: string | undefined;
   /** Email or account id to preselect. */
-  loginHint?: string;
+  loginHint?: string | undefined;
   /** Keep the scopes the user granted earlier in addition to the new ones. Default true. */
-  includeGrantedScopes?: boolean;
+  includeGrantedScopes?: boolean | undefined;
   /**
    * Use PKCE. Required for clients without a secret, recommended for all.
    * Default true.
    */
-  pkce?: boolean;
+  pkce?: boolean | undefined;
   /** Overrides the client's redirect URI. */
-  redirectUri?: string;
+  redirectUri?: string | undefined;
 }
 
 /** Result of {@link OAuth2.authUrl}. */
@@ -284,7 +284,11 @@ export class OAuth2 {
     return this.#refreshing;
   }
 
-  /** Revokes the tokens at Google and forgets them. The user has to consent again afterwards. */
+  /**
+   * Revokes the tokens at Google and forgets them. `onTokens` is called with
+   * an empty object so the stored copy can be deleted. The user has to consent
+   * again afterwards.
+   */
   async revoke(): Promise<void> {
     const token = this.#tokens.refreshToken ?? this.#tokens.accessToken;
     if (!token) return;
@@ -292,6 +296,8 @@ export class OAuth2 {
     if (!response.ok) await this.#fail(response, "revoke the token");
     this.#epoch++;
     this.#tokens = {};
+    // The stored copy is dead too: tell whoever keeps it.
+    await this.#onTokens?.({});
     this.#events.emit("tokens", {});
   }
 
@@ -338,7 +344,11 @@ export class OAuth2 {
     const deadline = Date.now() + device.expiresIn * 1000;
     let interval = device.interval;
     while (Date.now() < deadline) {
-      await sleep(interval * 1000, options.signal);
+      try {
+        await sleep(interval * 1000, options.signal);
+      } catch (cause) {
+        throw new YouTubeRequestError("ABORTED", "oauth.pollDeviceToken", "waiting for the device was aborted.", { cause });
+      }
       try {
         return await this.#grant({ grant_type: "urn:ietf:params:oauth:grant-type:device_code", device_code: device.deviceCode });
       } catch (error) {

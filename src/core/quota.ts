@@ -21,14 +21,14 @@ export const DEFAULT_QUOTA_LIMITS: Readonly<Record<QuotaBucket, number>> = Objec
 /** Quota settings of the client. */
 export interface QuotaOptions {
   /** Daily limits of your project, when they differ from the defaults. */
-  limits?: Partial<Record<QuotaBucket, number>>;
+  limits?: Partial<Record<QuotaBucket, number>> | undefined;
   /**
    * Refuse a call that would go over a limit, before it is sent. The call
    * throws a `YouTubeQuotaBudgetError` and costs nothing. Off by default.
    */
-  enforce?: boolean;
+  enforce?: boolean | undefined;
   /** Usage saved earlier with `yt.quota.snapshot()`, to carry the count across restarts. */
-  restore?: QuotaSnapshot;
+  restore?: QuotaSnapshot | undefined;
 }
 
 /** Serializable usage, see {@link QuotaTracker.snapshot}. */
@@ -49,14 +49,17 @@ export interface QuotaEvent {
 }
 
 const PACIFIC = "America/Los_Angeles";
-const dayFormat = new Intl.DateTimeFormat("en-CA", { timeZone: PACIFIC, year: "numeric", month: "2-digit", day: "2-digit" });
-const clockFormat = new Intl.DateTimeFormat("en-GB", { timeZone: PACIFIC, hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
+// Built on first use: importing the package then has no effect of its own.
+let dayFormat: Intl.DateTimeFormat | undefined;
+let clockFormat: Intl.DateTimeFormat | undefined;
 
 function pacificDay(now: number): string {
+  dayFormat ??= new Intl.DateTimeFormat("en-CA", { timeZone: PACIFIC, year: "numeric", month: "2-digit", day: "2-digit" });
   return dayFormat.format(now);
 }
 
 function secondsIntoPacificDay(now: number): number {
+  clockFormat ??= new Intl.DateTimeFormat("en-GB", { timeZone: PACIFIC, hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
   const [h = 0, m = 0, s = 0] = clockFormat.format(now).split(":").map(Number);
   return h * 3600 + m * 60 + s;
 }
@@ -142,9 +145,9 @@ export class QuotaTracker {
     return Math.max(0, this.#limits[bucket] - (this.#usage[bucket] ?? 0));
   }
 
-  /** Whether a call of `cost` units still fits in the bucket. */
+  /** Whether a call of `cost` units still fits in the bucket, next to the calls already in flight. */
   canAfford(cost: number, bucket: QuotaBucket = "default"): boolean {
-    return this.remaining(bucket) >= cost;
+    return this.remaining(bucket) - (this.#enforce ? (this.#pending[bucket] ?? 0) : 0) >= cost;
   }
 
   /** Usage as plain data, to store and give back through the `quota.restore` option. */

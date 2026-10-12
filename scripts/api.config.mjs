@@ -73,7 +73,7 @@ export const required = {
 
   SearchResultSnippet: ["publishedAt", "channelId", "title", "description", "thumbnails", "channelTitle", "liveBroadcastContent"],
 
-  CommentSnippet: ["textDisplay", "textOriginal", "authorDisplayName", "authorProfileImageUrl", "authorChannelUrl", "canRate", "viewerRating", "likeCount", "publishedAt", "updatedAt"],
+  CommentSnippet: ["textDisplay", "authorDisplayName", "authorProfileImageUrl", "authorChannelUrl", "canRate", "viewerRating", "likeCount", "publishedAt", "updatedAt"],
   CommentThreadSnippet: ["topLevelComment", "canReply", "totalReplyCount", "isPublic"],
   CommentThreadReplies: ["comments"],
 
@@ -98,6 +98,23 @@ export const required = {
   VideoStatsStatistics: ["viewCount"],
 };
 
+/**
+ * Types the API description states too loosely. A comment nested in a thread
+ * comes with its snippet, like the thread it belongs to.
+ */
+export const schemaTypes = {
+  "CommentThreadSnippet.topLevelComment": 'Comment<"snippet">',
+  "CommentThreadReplies.comments": 'Comment<"snippet">[]',
+};
+
+/** Descriptions of resources whose text in the API description is wrong or missing. */
+export const schemaDocs = {
+  VideoStatus: "The upload, processing and privacy status of a video.",
+  VideoAbuseReportReasonSnippet: "The label of a reason for reporting a video, and its secondary reasons.",
+  SuperChatEvent: "A Super Chat or Super Sticker purchased during one of your live broadcasts.",
+  LiveChatBan: "A ban of a user from a live chat, permanent or temporary.",
+};
+
 const DATE = "string | Date";
 
 /**
@@ -113,6 +130,8 @@ const DATE = "string | Date";
  * - `optionalBody`: the method declares a body it does not need.
  * - `handwritten`: the types and the method table are generated, the method itself lives in src/.
  * - `deprecated`: marks the method `@deprecated` with this reason.
+ * - `docs`: description of a parameter, when the API description has none or a wrong one.
+ * - `partOf`: the resource the `part` parameter belongs to, when it cannot be derived.
  */
 export const methods = {
   // ----- activities
@@ -120,6 +139,13 @@ export const methods = {
     summary: "Lists what a channel did recently: uploads, likes made public, playlist additions and so on.",
     quota: 1,
     types: { publishedAfter: DATE, publishedBefore: DATE },
+    docs: {
+      channelId: "Channel whose activities to list.",
+      mine: "List the activities of the authenticated user instead of a given channel.",
+      publishedAfter: "Only activities that happened at or after this moment.",
+      publishedBefore: "Only activities that happened before this moment.",
+      regionCode: "ISO 3166-1 alpha-2 country code, used when the user's activity alone gives too few results.",
+    },
     example: `const { items } = await yt.activities.list({ part: ["snippet", "contentDetails"], channelId, maxResults: 10 });
 for (const activity of items) console.log(activity.snippet.type, activity.snippet.title);`,
   },
@@ -135,6 +161,7 @@ const english = items.find((track) => track.snippet.language === "en");`,
   "youtube.captions.insert": {
     summary: "Uploads a caption track for one of your videos. The file must carry its own timing.",
     quota: 400,
+    docs: { sync: "No longer supported: since April 2024 YouTube does not time a transcript for you. The file must carry its own timing." },
     example: `await yt.captions.insert({
   body: { snippet: { videoId, language: "en", name: "English" } },
   media: { body: srtText, mimeType: "application/x-subrip" },
@@ -143,6 +170,7 @@ const english = items.find((track) => track.snippet.language === "en");`,
   "youtube.captions.update": {
     summary: "Updates a caption track: its draft status, its file, or both.",
     quota: 450,
+    docs: { sync: "No longer supported: since April 2024 YouTube does not time a transcript for you. The file must carry its own timing." },
     example: `await yt.captions.update({ body: { id: captionId, snippet: { isDraft: false } } });`,
   },
   "youtube.captions.download": {
@@ -151,6 +179,7 @@ const english = items.find((track) => track.snippet.language === "en");`,
     auth: "oauth",
     response: "text",
     types: { tfmt: `"sbv" | "scc" | "srt" | "ttml" | "vtt"` },
+    docs: { tfmt: "Converts the track to this format. Left out, the track comes in the format it was uploaded in." },
     example: `const vtt = await yt.captions.download({ id: captionId, tfmt: "vtt" });`,
   },
   "youtube.captions.delete": {
@@ -172,7 +201,7 @@ await yt.channels.update({ body: { id: channelId, brandingSettings: { image: { b
   // ----- channels
   "youtube.channels.list": {
     summary:
-      "Fetches channels by id, handle, legacy username, or the authenticated user's own channel. Pass exactly one of `id`, `forHandle`, `forUsername`, `mine` or `managedByMe`.",
+      "Fetches channels by id, handle, legacy username, or the authenticated user's own channel. Pass one filter: `id`, `forHandle`, `forUsername`, `mine`, `managedByMe` or `mySubscribers`.",
     quota: 1,
     example: `const channel = await yt.channels.list({ part: ["snippet", "statistics"], forHandle: "@GoogleDevelopers" }).first();
 console.log(channel?.snippet.title, channel?.statistics.subscriberCount);`,
@@ -230,10 +259,12 @@ console.log(channel?.snippet.title, channel?.statistics.subscriberCount);`,
   "youtube.comments.setModerationStatus": {
     summary: "Publishes, holds for review or rejects comments on your channel or videos. `banAuthor` also blocks the author when rejecting.",
     quota: 50,
+    types: { moderationStatus: `"published" | "heldForReview" | "rejected"` },
+    docs: { moderationStatus: "The status to give the comments: `published` shows them, `heldForReview` hides them until a moderator decides, `rejected` removes them from view." },
     example: `await yt.comments.setModerationStatus({ id: [commentId], moderationStatus: "rejected", banAuthor: true });`,
   },
   "youtube.comments.markAsSpam": {
-    summary: "Flagged comments as spam.",
+    summary: "Flags comments as spam.",
     quota: 50,
     deprecated: "YouTube no longer supports this method. Use `setModerationStatus` to reject a comment instead.",
   },
@@ -248,6 +279,8 @@ console.log(channel?.snippet.title, channel?.statistics.subscriberCount);`,
     summary:
       "Lists comment threads: the top-level comments of a video (`videoId`), everything on a channel (`allThreadsRelatedToChannelId`), or specific threads (`id`). Ask for the `replies` part to get up to five replies inline.",
     quota: 1,
+    types: { moderationStatus: `"published" | "heldForReview" | "likelySpam"` },
+    docs: { moderationStatus: "Only threads in this moderation state. `heldForReview` and `likelySpam` are only visible to the owner of the channel or video. Default `published`." },
     example: `for await (const thread of yt.commentThreads.list({ part: ["snippet", "replies"], videoId, order: "relevance" })) {
   const top = thread.snippet.topLevelComment.snippet;
   console.log(top?.authorDisplayName, top?.textDisplay, thread.snippet.totalReplyCount);
@@ -389,6 +422,7 @@ for (const result of items) console.log(result.id.videoId, result.snippet.title)
   "youtube.subscriptions.list": {
     summary: "Lists the channels someone is subscribed to (`channelId` or `mine`), or who subscribes to you (`mySubscribers`).",
     quota: 1,
+    docs: { myRecentSubscribers: "List the subscribers of the authenticated user's channel, most recent first." },
     example: `for await (const subscription of yt.subscriptions.list({ part: "snippet", mine: true, order: "alphabetical" })) {
   console.log(subscription.snippet.title, subscription.snippet.resourceId.channelId);
 }`,
@@ -425,11 +459,13 @@ for (const result of items) console.log(result.id.videoId, result.snippet.title)
   "youtube.videoAbuseReportReasons.list": {
     summary: "Lists the reasons accepted by `videos.reportAbuse`.",
     quota: 1,
+    docs: { hl: "Language of the labels, for example `fr`." },
     example: `const { items } = await yt.videoAbuseReportReasons.list({ part: ["id", "snippet"], hl: "en" });`,
   },
   "youtube.videoCategories.list": {
     summary: "Lists the video categories available in a region, or fetches categories by id.",
     quota: 1,
+    docs: { hl: "Language of the category titles, for example `fr`.", regionCode: "ISO 3166-1 alpha-2 country code whose categories to list." },
     example: `const { items } = await yt.videoCategories.list({ part: "snippet", regionCode: "FR", hl: "fr" });
 const assignable = items.filter((category) => category.snippet.assignable);`,
   },
@@ -440,6 +476,10 @@ const assignable = items.filter((category) => category.snippet.assignable);`,
       "Fetches videos by id, the most popular chart, or the ones you rated. Pass exactly one of `id`, `chart` or `myRating`. Any number of ids works: they are split into calls of 50.",
     quota: 1,
     types: { myRating: `"like" | "dislike"` },
+    docs: {
+      maxWidth: "Largest width of the embedded player returned in the `player` part.",
+      maxHeight: "Largest height of the embedded player returned in the `player` part.",
+    },
     example: `const { items } = await yt.videos.list({ part: ["snippet", "statistics", "contentDetails"], id: [videoId] });
 for (const video of items) {
   console.log(video.snippet.title, video.statistics.viewCount, video.contentDetails.duration);
@@ -494,6 +534,8 @@ console.log(items[0]?.rating);`,
     summary: "Fetches fresh statistics for many videos in one call. It has its own quota bucket, so polling view counts does not eat into the main one.",
     quota: 1,
     bucket: "videos.batchGetStats",
+    requires: ["id"],
+    docs: { id: "The videos to fetch statistics for. Any number of ids: lists longer than 50 are split across calls." },
     example: `const { items } = await yt.videos.batchGetStats({ part: ["statistics"], id: [videoId] });`,
   },
   "youtube.videoTrainability.get": {
@@ -509,7 +551,7 @@ console.log(items[0]?.rating);`,
     quota: 50,
     example: `await yt.watermarks.set({
   channelId,
-  body: { timing: { type: "offsetFromStart", offsetMs: "15000" }, position: { type: "corner", cornerPosition: "topRight" } },
+  body: { timing: { type: "offsetFromStart", offsetMs: "15000", durationMs: "10000" } },
   media: image,
 });`,
   },
@@ -553,6 +595,7 @@ console.log(items[0]?.rating);`,
   "youtube.liveBroadcasts.transition": {
     summary: "Moves a broadcast to `testing`, `live` or `complete`. The bound stream must be active before going to `testing` or `live`.",
     quota: 1,
+    docs: { broadcastStatus: "Where to move the broadcast: `testing` shows it to you only, `live` shows it to its audience, `complete` ends it." },
     example: `await yt.liveBroadcasts.transition({ id: broadcastId, broadcastStatus: "live", part: ["status"] });`,
   },
   "youtube.liveBroadcasts.insertCuepoint": {
@@ -606,6 +649,7 @@ console.log("ask again in", page.raw.pollingIntervalMillis, "ms");`,
   "youtube.youtube.v3.liveChat.messages.stream": {
     summary: "Receives live chat messages over one long-lived connection.",
     quota: 5,
+    partOf: "LiveChatMessage",
     requires: ["liveChatId"],
     handwritten: true,
   },

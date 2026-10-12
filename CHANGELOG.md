@@ -79,8 +79,8 @@ written in TypeScript.
   `parseChannelRef`, `channelPlaylistId`, `urls`, `parseDuration`,
   `formatDuration`, `formatCount`, `bestThumbnail`, `oEmbed`, `fetchFeed`,
   `VideoCategories`, `Scopes`.
-- **Events** on the client: `request`, `response`, `retry`, `quota`.
-- `yt.as(token)` to act for another user while sharing cache and quota.
+- **Events** on the client: `request`, `response`, `retry`, `quota`, `error`.
+- `yt.as(token, overrides)` to act for another user while sharing cache and quota.
 - ES module and CommonJS builds with their own type declarations. No runtime
   dependency.
 

@@ -5,11 +5,11 @@
  * oauth.authUrl({ scopes: [Scopes.readonly, Scopes.upload] });
  */
 export const Scopes = Object.freeze({
-  /** Manage the YouTube account: read and write everything except deleting comments made by others. */
+  /** Manage the YouTube account: videos, playlists, subscriptions, live broadcasts. Comments and captions need `forceSsl`. */
   manage: "https://www.googleapis.com/auth/youtube",
   /** View the YouTube account. */
   readonly: "https://www.googleapis.com/auth/youtube.readonly",
-  /** Upload videos and manage them. */
+  /** Upload videos, thumbnails, channel banners and watermarks. Editing or deleting a video needs `manage`. */
   upload: "https://www.googleapis.com/auth/youtube.upload",
   /** Everything `manage` does, plus comments and captions. Required by the comment methods. */
   forceSsl: "https://www.googleapis.com/auth/youtube.force-ssl",

@@ -2,7 +2,7 @@ import { Analytics } from "./analytics.js";
 import { OAuth2, type OAuth2Options } from "./auth/oauth2.js";
 import type { CacheOptions } from "./core/cache.js";
 import { YouTubeArgumentError } from "./core/errors.js";
-import type { QuotaOptions, QuotaTracker } from "./core/quota.js";
+import type { QuotaBucket, QuotaOptions, QuotaTracker } from "./core/quota.js";
 import { type AccessTokenProvider, type ClientEvents, type RequestOptions, Rest, type RetryOptions } from "./core/rest.js";
 import type { Duration } from "./core/time.js";
 import { Watcher, type WatcherOptions } from "./feeds/watcher.js";
@@ -44,41 +44,48 @@ export interface YouTubeOptions {
   /**
    * API key, enough to read public data. Create one in the Google Cloud
    * console under APIs & Services > Credentials, with the YouTube Data API v3
-   * enabled. When no credentials are given, the `YOUTUBE_API_KEY` environment
-   * variable is used.
+   * enabled. When left out, the `YOUTUBE_API_KEY` environment variable is used.
    */
-  apiKey?: string;
+  apiKey?: string | undefined;
   /**
    * OAuth 2.0 client that keeps tokens fresh, or the options to build one.
    * Needed for anything private or any write.
    */
-  oauth?: OAuth2 | OAuth2Options;
+  oauth?: OAuth2 | OAuth2Options | undefined;
   /**
    * A ready-made access token, or a function that returns one, when token
    * handling lives elsewhere. No automatic refresh in this mode.
    */
-  accessToken?: AccessTokenProvider;
+  accessToken?: AccessTokenProvider | undefined;
   /**
    * Caches successful reads. `true` keeps them 5 minutes in memory; an object
    * sets the freshness, a per-method policy or a custom store. Off by default.
    */
-  cache?: boolean | CacheOptions;
+  cache?: boolean | CacheOptions | undefined;
   /** Daily limits, optional enforcement and restored usage for the quota tracker. */
-  quota?: QuotaOptions;
+  quota?: QuotaOptions | undefined;
   /** Retries on rate limits, server errors and network failures. Default: 3 retries with exponential backoff. `false` disables them. */
-  retry?: RetryOptions | false;
-  /** Time allowed for one attempt. Default `"30s"`. Uploads are not subject to it. */
-  timeout?: Duration;
+  retry?: RetryOptions | false | undefined;
+  /**
+   * Time allowed for one attempt. Default `"30s"`, and `0` turns it off.
+   * Uploads, report downloads and the live chat stream are not subject to it:
+   * give those a `signal`.
+   */
+  timeout?: Duration | undefined;
   /** Custom `fetch`, for a proxy, an instrumented client or tests. */
-  fetch?: typeof fetch;
+  fetch?: typeof fetch | undefined;
   /** Root of the Data API, to go through a proxy. Default `https://youtube.googleapis.com/`. */
-  baseUrl?: string;
+  baseUrl?: string | undefined;
   /** Headers added to every request. */
-  headers?: Record<string, string>;
+  headers?: Record<string, string> | undefined;
   /** Per-user quota key sent with every request, for server apps that enforce per-user limits. */
-  quotaUser?: string;
-  /** For YouTube content partners: content owner every request is made on behalf of. */
-  onBehalfOfContentOwner?: string;
+  quotaUser?: string | undefined;
+  /**
+   * For YouTube content partners: the content owner requests are made on
+   * behalf of. It is sent with every method that accepts it, and those calls
+   * then need OAuth.
+   */
+  onBehalfOfContentOwner?: string | undefined;
 }
 
 function envApiKey(): string | undefined {
@@ -124,9 +131,12 @@ export class YouTube {
    * @param options - Settings, or just an API key.
    */
   constructor(options: YouTubeOptions | string = {}, /** @internal */ shared?: Rest) {
+    if (options === null || (typeof options !== "string" && typeof options !== "object")) {
+      throw new YouTubeArgumentError("new YouTube() takes an options object or an API key.");
+    }
     const resolved: YouTubeOptions = typeof options === "string" ? { apiKey: options } : { ...options };
-    if (typeof resolved !== "object" || resolved === null) throw new YouTubeArgumentError("new YouTube() takes an options object or an API key.");
-    if (!resolved.apiKey && !resolved.oauth && !resolved.accessToken) {
+    // Also next to OAuth: public reads then work before the user has signed in.
+    if (!resolved.apiKey) {
       const fromEnv = envApiKey();
       if (fromEnv) resolved.apiKey = fromEnv;
     }
@@ -367,7 +377,8 @@ export class YouTube {
 
   /**
    * Subscribes to what the client does: `request`, `response`, `retry`,
-   * `quota`. Returns a function that unsubscribes.
+   * `quota`, and `error` for a listener or a cache store that failed.
+   * Returns a function that unsubscribes.
    *
    * @example
    * yt.on("response", ({ method, duration, cost, cached }) => {
@@ -391,7 +402,7 @@ export class YouTube {
   /**
    * Returns a client that acts for another user, sharing this one's cache,
    * quota count, events and settings. Meant for servers that hold the tokens
-   * of many users.
+   * of many users. `overrides` changes the few settings that are per user.
    *
    * @example
    * app.get("/me", async (req, res) => {
@@ -399,14 +410,17 @@ export class YouTube {
    *   res.json(await user.channels.mine());
    * });
    */
-  as(credentials: AccessTokenProvider | OAuth2): YouTube {
+  as(credentials: AccessTokenProvider | OAuth2, overrides: Pick<YouTubeOptions, "quotaUser" | "headers" | "onBehalfOfContentOwner"> = {}): YouTube {
     const { oauth: _oauth, accessToken: _token, ...rest } = this.#options;
-    return new YouTube(credentials instanceof OAuth2 ? { ...rest, oauth: credentials } : { ...rest, accessToken: credentials }, this.#rest);
+    const settings = { ...rest, ...overrides };
+    return new YouTube(credentials instanceof OAuth2 ? { ...settings, oauth: credentials } : { ...settings, accessToken: credentials }, this.#rest);
   }
 
   /**
    * Calls a method by name, for the rare case where you build the call
-   * dynamically. The typed resources (`yt.videos.list(...)`) are the normal way.
+   * dynamically. The typed resources (`yt.videos.list(...)`) are the normal
+   * way. Parameters are sent as given: `part` is not filled in from the body
+   * and long id lists are not split.
    *
    * @example
    * const response = await yt.request("videos.list", { part: "id", chart: "mostPopular" });
@@ -424,13 +438,15 @@ export class YouTube {
 }
 
 /**
- * Quota cost of a method, in units, and the bucket it is charged to.
+ * Quota cost of a method, in units, and the bucket it is charged to. For the
+ * Analytics and Reporting APIs, which Google does not bill in units, the cost
+ * is a plain call count.
  *
  * @example
  * quotaCost("playlistItems.insert"); // { cost: 50, bucket: "default" }
  * quotaCost("search.list");          // { cost: 1, bucket: "search.list" }
  */
-export function quotaCost(method: MethodId): { cost: number; bucket: string } {
+export function quotaCost(method: MethodId): { cost: number; bucket: QuotaBucket } {
   const spec = METHODS[method];
   if (!spec) throw new YouTubeArgumentError(`Unknown method "${method}".`);
   return { cost: spec.quota, bucket: spec.bucket };

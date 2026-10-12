@@ -1,6 +1,7 @@
 import { YouTubeArgumentError } from "../core/errors.js";
 import type { ListRequest } from "../core/pagination.js";
 import type { RequestOptions } from "../core/rest.js";
+import { METHODS } from "../generated/methods.js";
 import type { VideosListParams } from "../generated/params.js";
 import { VideosApi } from "../generated/resources.js";
 import type { Video, VideoListResponse, VideoPart, VideoRating } from "../generated/schemas.js";
@@ -70,7 +71,7 @@ export class Videos extends VideosApi {
     options: PartOptions<P> & Pick<VideosListParams, "regionCode" | "videoCategoryId" | "hl" | "maxResults"> = {},
   ): ListRequest<Video<P>, VideoListResponse> {
     const { part = DEFAULT_PARTS as readonly VideoPart[] as readonly P[], regionCode, videoCategoryId, hl, maxResults, ...request } = options;
-    return this.list({ part, chart: "mostPopular", regionCode, videoCategoryId, hl, maxResults } as VideosListParams<P>, request);
+    return this._list(METHODS["videos.list"], { part, chart: "mostPopular", regionCode, videoCategoryId, hl, maxResults }, request, true);
   }
 
   /** Likes a video as the authenticated user. Quota: 50 units. */
@@ -90,6 +91,8 @@ export class Videos extends VideosApi {
 
   /**
    * Tells how the authenticated user rated a video.
+   *
+   * Quota: 1 unit.
    *
    * @example
    * if ((await yt.videos.ratingOf(videoId)) !== "like") await yt.videos.like(videoId);

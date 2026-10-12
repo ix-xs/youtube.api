@@ -28,7 +28,7 @@ export type YouTubeLink =
 const HOSTS = /^(?:(?:www|m|music|gaming)\.)?(?:youtube\.com|youtube-nocookie\.com)$/i;
 const VIDEO_ID = /^[\w-]{11}$/;
 const CHANNEL_ID = /^UC[\w-]{22}$/;
-const PLAYLIST_ID = /^(?:PL|UU|LL|FL|RD|OL|WL|EL|TL)[\w-]*$/;
+const PLAYLIST_ID = /^(?:(?:PL|UU|FL|RD|OL|EL|TL|LL)[\w-]{10,}|WL|LL)$/;
 const RESERVED = new Set(["watch", "playlist", "feed", "results", "shorts", "live", "embed", "channel", "user", "c", "v", "e", "gaming", "premium", "music", "about", "account", "t", "s", "hashtag", "post", "clip", "source", "attribution_link", "redirect", "oembed"]);
 
 /** Whether a string looks like a video id (11 URL-safe characters). */
@@ -43,7 +43,7 @@ export function isChannelId(value: string): boolean {
 
 /** Whether a string looks like a playlist id. */
 export function isPlaylistId(value: string): boolean {
-  return PLAYLIST_ID.test(value) && value.length >= 2 && !VIDEO_ID.test(value);
+  return PLAYLIST_ID.test(value) && !VIDEO_ID.test(value);
 }
 
 function seconds(value: string | null): number | undefined {
@@ -152,7 +152,8 @@ export function parseChannelRef(input: string): ChannelRef {
   if (!value) throw new YouTubeArgumentError("Expected a channel id, a handle or a channel URL, got an empty string.");
   if (CHANNEL_ID.test(value)) return { by: "id", value };
   if (value.startsWith("@")) return { by: "handle", value };
-  if (/[/.]/.test(value)) {
+  // A handle can contain dots, so a dot alone does not make a URL.
+  if (value.includes("/") || /^(?:[\w-]+\.)*(?:youtube\.com|youtu\.be|youtube-nocookie\.com)$/i.test(value)) {
     const link = parseUrl(value);
     if (link?.type === "channel") {
       if (link.channelId) return { by: "id", value: link.channelId };
@@ -195,7 +196,9 @@ const PLAYLIST_PREFIX: Record<ChannelPlaylistKind, string> = {
  *
  * `uploads` is documented by YouTube (it is `contentDetails.relatedPlaylists.uploads`).
  * The other kinds are not documented but have been stable for years: `videos`
- * leaves out Shorts and live streams, `shorts` and `live` keep only those.
+ * leaves out Shorts and live streams, `shorts` and `live` keep only those,
+ * the three `popular` kinds are the same lists sorted by views, and
+ * `membersOnlyVideos` holds what the channel reserves for its members.
  *
  * @example
  * channelPlaylistId("UC_x5XG1OV2P6uZZ5FSM9Ttw");           // "UU_x5XG1OV2P6uZZ5FSM9Ttw"
@@ -209,25 +212,25 @@ export function channelPlaylistId(channelId: string, kind: ChannelPlaylistKind =
 /** Options of {@link urls.video}. */
 export interface VideoUrlOptions {
   /** Start offset in seconds. */
-  start?: number;
+  start?: number | undefined;
   /** Plays the video inside this playlist. */
-  playlistId?: string;
+  playlistId?: string | undefined;
   /** Uses the short `youtu.be` domain. */
-  short?: boolean;
+  short?: boolean | undefined;
 }
 
 /** Options of {@link urls.embed}. */
 export interface EmbedUrlOptions {
-  start?: number;
-  end?: number;
-  autoplay?: boolean;
-  mute?: boolean;
-  loop?: boolean;
-  controls?: boolean;
+  start?: number | undefined;
+  end?: number | undefined;
+  autoplay?: boolean | undefined;
+  mute?: boolean | undefined;
+  loop?: boolean | undefined;
+  controls?: boolean | undefined;
   /** Serves the player from `youtube-nocookie.com`, which sets no cookie until playback. */
-  noCookie?: boolean;
+  noCookie?: boolean | undefined;
   /** Interface language of the player, for example `"fr"`. */
-  hl?: string;
+  hl?: string | undefined;
 }
 
 /** Thumbnail sizes YouTube generates for every video. `maxres` is missing on older or low-resolution uploads. */

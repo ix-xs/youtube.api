@@ -23,8 +23,9 @@ severity warrants, with credit unless you prefer to remain anonymous.
 ## What the library does with your credentials
 
 - The API key is sent in the `X-Goog-Api-Key` header, never in a URL.
-- Access tokens are only sent to Google's API hosts. `yt.reporting.download()`
-  refuses any other host.
+- Access tokens are only sent to Google's API hosts, unless you point
+  `baseUrl` somewhere else: the key and the tokens then go to that host.
+  `yt.reporting.download()` refuses any host but Google's.
 - URLs in errors and events have credentials removed.
 - Nothing is written to disk unless you call `tokenFile()`, which creates the
   file readable by the current user only.

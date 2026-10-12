@@ -48,7 +48,7 @@ const MIME_TYPES: Record<string, string> = {
  *   media: await fileMedia("./holiday.mp4", { onProgress: ({ percent }) => console.log(percent) }),
  * });
  */
-export async function fileMedia(path: string, options: { mimeType?: string; chunkSize?: number; resumeUri?: string; onProgress?: (progress: UploadProgress) => void } = {}): Promise<MediaOptions> {
+export async function fileMedia(path: string, options: { mimeType?: string | undefined; chunkSize?: number | undefined; resumeUri?: string | undefined; onProgress?: ((progress: UploadProgress) => void) | undefined } = {}): Promise<MediaOptions> {
   const mimeType = options.mimeType ?? MIME_TYPES[extname(path).toLowerCase()] ?? "application/octet-stream";
   const body = await openAsBlob(path, { type: mimeType });
   return { ...options, body, mimeType };
@@ -106,13 +106,13 @@ export interface AuthorizeOptions {
   /** Scopes to request. */
   scopes: readonly Scope[];
   /** Local port to listen on. Default: any free port, which the "Desktop app" client type accepts. */
-  port?: number;
+  port?: number | undefined;
   /** Open the consent page in the default browser. Default true. The URL is printed either way. */
-  open?: boolean;
+  open?: boolean | undefined;
   /** Called with the consent URL. Default: prints it. */
-  onUrl?: (url: string) => void;
+  onUrl?: ((url: string) => void) | undefined;
   /** How long to wait for the user. Default `"5m"`. */
-  timeout?: Duration;
+  timeout?: Duration | undefined;
 }
 
 /**
@@ -182,9 +182,9 @@ export interface WebSubListenerOptions extends WebSubReceiveOptions {
   /** Called for each notification with a valid signature. */
   onNotification: (notification: WebSubNotification) => void | Promise<void>;
   /** Called when the hub confirms a subscription or its removal. */
-  onConfirmation?: (confirmation: NonNullable<WebSubResult["confirmation"]>) => void;
+  onConfirmation?: ((confirmation: NonNullable<WebSubResult["confirmation"]>) => void) | undefined;
   /** Called when a handler throws. Default: logs to the console. */
-  onError?: (error: unknown) => void;
+  onError?: ((error: unknown) => void) | undefined;
 }
 
 /**

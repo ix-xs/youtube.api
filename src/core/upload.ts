@@ -20,16 +20,20 @@ export interface UploadProgress {
 export interface MediaOptions {
   /** The bytes. */
   body: MediaBody;
-  /** MIME type. Defaults to the Blob's type, or `application/octet-stream`. */
-  mimeType?: string;
+  /** MIME type. Defaults to the Blob's type, to `text/plain` for a string, and to `application/octet-stream` otherwise. */
+  mimeType?: string | undefined;
   /** Total size in bytes. Only used for streams, and only so progress can show a percentage: the stream is read to its end either way. */
-  size?: number;
+  size?: number | undefined;
   /** Bytes per request for resumable uploads. Rounded to a multiple of 256 KiB. Default 8 MiB. */
-  chunkSize?: number;
+  chunkSize?: number | undefined;
   /** Called after each confirmed chunk. */
-  onProgress?: (progress: UploadProgress) => void;
-  /** Session URI of an interrupted upload, to carry on where it stopped. */
-  resumeUri?: string;
+  onProgress?: ((progress: UploadProgress) => void) | undefined;
+  /**
+   * Session URI of an interrupted upload, to carry on where it stopped. The
+   * metadata and parameters given when the session was opened still apply:
+   * those of the resuming call are not sent again.
+   */
+  resumeUri?: string | undefined;
 }
 
 /** The `media` parameter: the bytes, or the bytes with options. */
@@ -311,6 +315,12 @@ async function resumable<T>(
     throw new YouTubeUploadError(`${request.method}: ${message}`, { sessionUri, uploaded: offset, cause });
   };
 
+  /** The session is gone: the error carries no `sessionUri`, since there is nothing left to resume. */
+  const expired = (): never => {
+    sessionUri = undefined;
+    return fail("the upload session expired. Start the upload again.");
+  };
+
   /** Asks the server how many bytes it has. Returns the final response if the upload is already complete. */
   const status = async (): Promise<Response | undefined> => {
     const response = await send(sessionUri!, {
@@ -325,7 +335,7 @@ async function resumable<T>(
     }
     if (response.status === 404 || response.status === 410) {
       void response.body?.cancel().catch(() => {});
-      return fail("the upload session expired. Start the upload again.");
+      return expired();
     }
     return response;
   };
@@ -406,7 +416,7 @@ async function resumable<T>(
       return readResult<T>(request, response);
     }
     if (response && response.status < 500 && response.status !== 408 && response.status !== 429) {
-      if (response.status === 404 || response.status === 410) return fail("the upload session expired. Start the upload again.");
+      if (response.status === 404 || response.status === 410) return expired();
       throw request.parseError(response, await response.text().catch(() => ""));
     }
 

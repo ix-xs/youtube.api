@@ -16,10 +16,13 @@ export type DefaultChannelPart = "snippet" | "contentDetails" | "statistics";
 /** Options shared by the helpers that fetch a resource: which parts, plus the usual request options. */
 export interface PartOptions<P extends string> extends RequestOptions {
   /** Parts to fetch. The result type follows this list. */
-  part?: OneOrMany<P>;
+  part?: OneOrMany<P> | undefined;
 }
 
 const DEFAULT_PARTS: readonly DefaultChannelPart[] = ["snippet", "contentDetails", "statistics"];
+
+/** One entry per channel, however the reference was written: "@Name", a URL of it, another case. */
+const cacheKey = (ref: ChannelRef): string => `${ref.by === "custom" ? "handle" : ref.by}:${ref.value.replace(/^@/, "").toLowerCase()}`;
 
 /**
  * `yt.channels`: the raw `channels` methods, plus helpers that accept a
@@ -41,7 +44,7 @@ export class Channels extends ChannelsApi {
         return [{ id: ref.value }];
       case "handle":
         // A bare name is most likely a handle, but old accounts still answer to a username.
-        return input.trim().startsWith("@") || /[/.]/.test(input) ? [{ forHandle: ref.value }] : [{ forHandle: ref.value }, { forUsername: input.trim() }];
+        return input.trim().startsWith("@") || input.includes("/") ? [{ forHandle: ref.value }] : [{ forHandle: ref.value }, { forUsername: input.trim() }];
       case "username":
         return [{ forUsername: ref.value }];
       case "custom":
@@ -65,10 +68,11 @@ export class Channels extends ChannelsApi {
    */
   async get<P extends ChannelPart = DefaultChannelPart>(channel: string, options: PartOptions<P> = {}): Promise<Channel<P> | null> {
     const { part = DEFAULT_PARTS as readonly ChannelPart[] as readonly P[], ...request } = options;
-    for (const filter of this.#filters(parseChannelRef(channel), channel)) {
+    const ref = parseChannelRef(channel);
+    for (const filter of this.#filters(ref, channel)) {
       const found = await this.list({ part, ...filter }, request).first();
       if (found) {
-        this.#ids.set(channel.trim().toLowerCase(), (found as { id: string }).id);
+        this.#ids.set(cacheKey(ref), (found as { id: string }).id);
         return found;
       }
     }
@@ -78,6 +82,8 @@ export class Channels extends ChannelsApi {
   /**
    * Fetches the channel of the authenticated user. Needs OAuth. Resolves to
    * `null` for a Google account that has no YouTube channel.
+   *
+   * Quota: 1 unit.
    *
    * @example
    * const me = await yt.channels.mine();
@@ -89,8 +95,9 @@ export class Channels extends ChannelsApi {
 
   /**
    * Turns any channel reference into its `UC...` id. Ids and `/channel/` URLs
-   * cost nothing; handles and usernames cost 1 unit the first time and are
-   * remembered afterwards.
+   * cost nothing. Handles and usernames cost 1 unit the first time (2 for a
+   * bare name that turns out to be a legacy username) and are remembered
+   * afterwards, whichever way the same handle is written.
    *
    * @example
    * await yt.channels.resolveId("@GoogleDevelopers"); // "UC_x5XG1OV2P6uZZ5FSM9Ttw"
@@ -98,8 +105,7 @@ export class Channels extends ChannelsApi {
   async resolveId(channel: string, options: RequestOptions = {}): Promise<string | null> {
     const ref = parseChannelRef(channel);
     if (ref.by === "id") return ref.value;
-    const key = channel.trim().toLowerCase();
-    const known = this.#ids.get(key);
+    const known = this.#ids.get(cacheKey(ref));
     if (known) return known;
     const found = await this.get(channel, { ...options, part: "id" });
     return found?.id ?? null;
@@ -118,7 +124,8 @@ export class Channels extends ChannelsApi {
    * streams.
    *
    * A channel that never uploaded has no such playlist: the request then
-   * fails with a `NOT_FOUND` error.
+   * fails with a `NOT_FOUND` error. A reference that matches no channel fails
+   * with a `YouTubeArgumentError`.
    *
    * @example
    * for await (const item of yt.channels.uploads("@GoogleDevelopers")) {
@@ -129,16 +136,17 @@ export class Channels extends ChannelsApi {
    */
   uploads<P extends PlaylistItemPart = "snippet" | "contentDetails">(
     channel: string,
-    options: PartOptions<P> & { kind?: ChannelPlaylistKind } = {},
+    options: PartOptions<P> & { kind?: ChannelPlaylistKind | undefined } = {},
   ): ListRequest<PlaylistItem<P>, PlaylistItemListResponse> {
     const { part = ["snippet", "contentDetails"] as readonly PlaylistItemPart[] as readonly P[], kind, ...request } = options;
-    return this._list(METHODS["playlistItems.list"], async () => ({ part, playlistId: channelPlaylistId(await this.#requireId(channel, request), kind) }), request);
+    return this._list(METHODS["playlistItems.list"], async () => ({ part, playlistId: channelPlaylistId(await this.#requireId(channel, request), kind) }), request, true);
   }
 
   /**
    * Fetches the most recent videos of a channel as full video resources, with
    * durations and statistics. Resolves to an empty array for a channel
-   * without uploads.
+   * without uploads, and throws a `YouTubeArgumentError` when no channel
+   * matches the reference.
    *
    * Quota: 2 units for up to 50 videos, plus 1 to resolve a handle the first time.
    *
@@ -148,7 +156,7 @@ export class Channels extends ChannelsApi {
    */
   async latestVideos<P extends VideoPart = DefaultVideoPart>(
     channel: string,
-    options: PartOptions<P> & { limit?: number; kind?: ChannelPlaylistKind } = {},
+    options: PartOptions<P> & { limit?: number | undefined; kind?: ChannelPlaylistKind | undefined } = {},
   ): Promise<Video<P>[]> {
     const { limit = 5, kind, part, ...request } = options;
     let items: PlaylistItem<"contentDetails">[];
@@ -167,11 +175,13 @@ export class Channels extends ChannelsApi {
   /**
    * Fetches the latest video of a channel, or `null` when it has none.
    *
+   * Quota: 2 units, plus 1 to resolve a handle the first time.
+   *
    * @example
    * const video = await yt.channels.latestVideo("@GoogleDevelopers");
    * if (video) console.log(`New video: ${video.snippet.title}`);
    */
-  async latestVideo<P extends VideoPart = DefaultVideoPart>(channel: string, options: PartOptions<P> & { kind?: ChannelPlaylistKind } = {}): Promise<Video<P> | null> {
+  async latestVideo<P extends VideoPart = DefaultVideoPart>(channel: string, options: PartOptions<P> & { kind?: ChannelPlaylistKind | undefined } = {}): Promise<Video<P> | null> {
     const [video] = await this.latestVideos<P>(channel, { ...options, limit: 1 });
     return video ?? null;
   }

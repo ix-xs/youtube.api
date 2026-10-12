@@ -84,7 +84,6 @@ export interface AnalyticsGroup {
    * and type of items that it contains.
    */
   contentDetails?: AnalyticsGroupContentDetails;
-  /** Apiary error details. */
   errors?: AnalyticsErrors;
 }
 
@@ -117,7 +116,6 @@ export interface AnalyticsGroupItem {
    * specifies the unique channel, video, playlist, or asset ID.
    */
   id?: string;
-  /** Apiary error details. */
   errors?: AnalyticsErrors;
   /** The ID that YouTube uses to uniquely identify the group that contains the item. */
   groupId?: string;
@@ -157,7 +155,6 @@ export interface AnalyticsListGroupItemsResponse {
   kind?: string;
   /** The Etag of this resource. */
   etag?: string;
-  /** Apiary error details. */
   errors?: AnalyticsErrors;
   /**
    * A list of groups that match the API request parameters. Each item in the list represents a
@@ -172,7 +169,6 @@ export interface AnalyticsListGroupsResponse {
   kind?: string;
   /** The Etag of this resource. */
   etag?: string;
-  /** Apiary error details. */
   errors?: AnalyticsErrors;
   /**
    * A list of groups that match the API request parameters. Each item in the list represents a `group`
@@ -268,17 +264,17 @@ export interface AnalyticsGroupsListParams extends OnBehalfOfContentOwner {
    * resource, the `id` property specifies the group's YouTube group ID. Note that if you do not
    * specify a value for the `id` parameter, then you must set the `mine` parameter to `true`.
    */
-  id?: string;
+  id?: string | undefined;
   /**
    * This parameter can only be used in a properly authorized request. Set this parameter's value to
    * true to retrieve all groups owned by the authenticated user.
    */
-  mine?: boolean;
+  mine?: boolean | undefined;
   /**
    * The `pageToken` parameter identifies a specific page in the result set that should be returned. In
    * an API response, the `nextPageToken` property identifies the next page that can be retrieved.
    */
-  pageToken?: string;
+  pageToken?: string | undefined;
 }
 
 /** Parameters of `analytics.groups.update`. */
@@ -313,17 +309,16 @@ export interface AnalyticsReportsQueryParams {
   /**
    * The currency to which financial metrics should be converted. The default is US Dollar (USD). If
    * the result contains no financial metrics, this flag will be ignored. Responds with an error if the
-   * specified currency is not recognized.", pattern: [A-Z]{3}.
+   * specified currency is not recognized.
    */
-  currency?: string;
+  currency?: string | undefined;
   /**
    * A comma-separated list of YouTube Analytics dimensions, such as `views` or `ageGroup,gender`. See
    * the [Available Reports](/youtube/analytics/v2/available_reports) document for a list of the
    * reports that you can retrieve and the dimensions used for those reports. Also see the
-   * [Dimensions](/youtube/analytics/v2/dimsmets/dims) document for definitions of those dimensions."
-   * pattern: [0-9a-zA-Z,]+.
+   * [Dimensions](/youtube/analytics/v2/dimsmets/dims) document for definitions of those dimensions.
    */
-  dimensions?: string;
+  dimensions?: string | undefined;
   /**
    * A list of filters that should be applied when retrieving YouTube Analytics data. The [Available
    * Reports](/youtube/analytics/v2/available_reports) document identifies the dimensions that can be
@@ -331,27 +326,27 @@ export interface AnalyticsReportsQueryParams {
    * defines those dimensions. If a request uses multiple filters, join them together with a semicolon
    * (`;`), and the returned result table will satisfy both filters. For example, a filters parameter
    * value of `video==dMH0bHeiRNg;country==IT` restricts the result set to include data for the given
-   * video in Italy.",.
+   * video in Italy.
    */
-  filters?: string;
+  filters?: string | undefined;
   /**
    * If set to true historical data (i.e. channel data from before the linking of the channel to the
-   * content owner) will be retrieved.",.
+   * content owner) will be retrieved.
    */
-  includeHistoricalChannelData?: boolean;
-  /** The maximum number of rows to include in the response.", minValue: 1. */
-  maxResults?: number;
+  includeHistoricalChannelData?: boolean | undefined;
+  /** The maximum number of rows to include in the response. */
+  maxResults?: number | undefined;
   /**
    * A comma-separated list of dimensions or metrics that determine the sort order for YouTube
    * Analytics data. By default the sort order is ascending. The '`-`' prefix causes descending sort
-   * order.", pattern: [-0-9a-zA-Z,]+.
+   * order.
    */
-  sort?: string;
+  sort?: string | undefined;
   /**
    * An index of the first entity to retrieve. Use this parameter as a pagination mechanism along with
-   * the max-results parameter (one-based, inclusive).", minValue: 1.
+   * the max-results parameter (one-based, inclusive).
    */
-  startIndex?: number;
+  startIndex?: number | undefined;
 }
 
 /** `yt.analytics.groupItems`: the `groupItems` methods of the YouTube Analytics API. */

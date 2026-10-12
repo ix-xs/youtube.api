@@ -230,7 +230,7 @@ export interface ActivityContentDetailsUpload {
 
 export interface ActivityListResponse {
   /**
-   * Identifies what kind of resource this is. Value: the fixed string "youtube#activityListResponse".
+   * Identifies what kind of resource this is. Value: the fixed string "youtube#activityListResponse.
    */
   kind: string;
   /** Etag of this resource. */
@@ -321,8 +321,8 @@ export interface AvailabilityConfigGlobalConfig {
 /** Video is available in the specified regions only. */
 export interface AvailabilityConfigRegionsConfig {
   /**
-   * Required. List of regions and time windows where video is available. If a region is specified
-   * multiple times, the union of all intervals is used.
+   * List of regions and time windows where video is available. If a region is specified multiple
+   * times, the union of all intervals is used.
    */
   regionIntervals?: AvailabilityConfigRegionsConfigRegionInterval[];
 }
@@ -336,7 +336,7 @@ export interface AvailabilityConfigRegionsConfigRegionInterval {
    * future.
    */
   interval?: Interval;
-  /** Required. Region where video is available. */
+  /** Region where video is available. */
   regionCode?: string;
 }
 
@@ -348,7 +348,7 @@ export interface AvailabilityConfigRegionsConfigRegionInterval {
  */
 export interface BatchGetStatsResponse {
   /**
-   * Identifies what kind of resource this is. Value: the fixed string "youtube#batchGetStatsResponse".
+   * Identifies what kind of resource this is. Value: the fixed string "youtube#batchGetStatsResponse.
    */
   kind: string;
   /** Etag of this resource. */
@@ -359,9 +359,9 @@ export interface BatchGetStatsResponse {
 
 /** Details about the brand partner linked to the video for Creator Initiated Linking (CIL). */
 export interface BrandPartner {
-  /** Required. Channel handle, must begin with "@". */
+  /** Channel handle, must begin with "@. */
   channelHandle?: string;
-  /** Required. External Channel ID, must begin with "UC". */
+  /** External Channel ID, must begin with "UC. */
   channelId?: string;
 }
 
@@ -373,7 +373,7 @@ export interface BrandPartner {
  * to the parts you asked for.
  */
 export interface CaptionResource {
-  /** Identifies what kind of resource this is. Value: the fixed string "youtube#caption". */
+  /** Identifies what kind of resource this is. Value: the fixed string "youtube#caption. */
   kind?: string;
   /** Etag of this resource. */
   etag?: string;
@@ -385,7 +385,7 @@ export interface CaptionResource {
 
 export interface CaptionListResponse {
   /**
-   * Identifies what kind of resource this is. Value: the fixed string "youtube#captionListResponse".
+   * Identifies what kind of resource this is. Value: the fixed string "youtube#captionListResponse.
    */
   kind: string;
   /** Etag of this resource. */
@@ -490,7 +490,7 @@ export interface CdnSettings {
  * to the parts you asked for.
  */
 export interface ChannelResource {
-  /** Identifies what kind of resource this is. Value: the fixed string "youtube#channel". */
+  /** Identifies what kind of resource this is. Value: the fixed string "youtube#channel. */
   kind?: string;
   /** Etag of this resource. */
   etag?: string;
@@ -550,7 +550,7 @@ export interface ChannelAuditDetails {
 /** A channel banner returned as the response to a channel_banner.insert call. */
 export interface ChannelBannerResource {
   /**
-   * Identifies what kind of resource this is. Value: the fixed string "youtube#channelBannerResource".
+   * Identifies what kind of resource this is. Value: the fixed string "youtube#channelBannerResource.
    */
   kind?: string;
   etag?: string;
@@ -580,29 +580,29 @@ export interface ChannelBrandingSettings {
 export interface ChannelContentDetails {
   relatedPlaylists: {
     /**
-     * The ID of the playlist that contains the channel"s favorite videos. Use the playlistItems.insert
+     * The ID of the playlist that contains the channel's favorite videos. Use the playlistItems.insert
      * and playlistItems.delete to add or remove items from that list.
      * @deprecated
      */
     favorites?: string;
     /**
-     * The ID of the playlist that contains the channel"s liked videos. Use the playlistItems.insert
+     * The ID of the playlist that contains the channel's liked videos. Use the playlistItems.insert
      * and playlistItems.delete to add or remove items from that list.
      */
     likes?: string;
     /**
-     * The ID of the playlist that contains the channel"s uploaded videos. Use the videos.insert method
+     * The ID of the playlist that contains the channel's uploaded videos. Use the videos.insert method
      * to upload new videos and the videos.delete method to delete previously uploaded videos.
      */
     uploads: string;
     /**
-     * The ID of the playlist that contains the channel"s watch history. Use the playlistItems.insert
+     * The ID of the playlist that contains the channel's watch history. Use the playlistItems.insert
      * and playlistItems.delete to add or remove items from that list.
      * @deprecated
      */
     watchHistory?: string;
     /**
-     * The ID of the playlist that contains the channel"s watch later playlist. Use the
+     * The ID of the playlist that contains the channel's watch later playlist. Use the
      * playlistItems.insert and playlistItems.delete to add or remove items from that list.
      * @deprecated
      */
@@ -657,7 +657,7 @@ export interface ChannelConversionPings {
 
 export interface ChannelListResponse {
   /**
-   * Identifies what kind of resource this is. Value: the fixed string "youtube#channelListResponse".
+   * Identifies what kind of resource this is. Value: the fixed string "youtube#channelListResponse.
    */
   kind: string;
   /** Etag of this resource. */
@@ -704,7 +704,7 @@ export interface ChannelProfileDetails {
   channelUrl?: string;
   /** The channel's display name. */
   displayName?: string;
-  /** The channels's avatar URL. */
+  /** The channel's avatar URL. */
   profileImageUrl?: string;
 }
 
@@ -713,7 +713,7 @@ export interface ChannelProfileDetails {
  * narrowed to the parts you asked for.
  */
 export interface ChannelSectionResource {
-  /** Identifies what kind of resource this is. Value: the fixed string "youtube#channelSection". */
+  /** Identifies what kind of resource this is. Value: the fixed string "youtube#channelSection. */
   kind?: string;
   /** Etag of this resource. */
   etag?: string;
@@ -755,7 +755,7 @@ export interface ChannelSectionContentDetails {
 export interface ChannelSectionListResponse {
   /**
    * Identifies what kind of resource this is. Value: the fixed string
-   * "youtube#channelSectionListResponse".
+   * "youtube#channelSectionListResponse.
    */
   kind: string;
   /** Etag of this resource. */
@@ -948,7 +948,7 @@ export interface ChannelStatistics {
 
 /** JSON template for the status part of a channel. */
 export interface ChannelStatus {
-  /** Whether the channel is considered ypp monetization enabled. See go/yppornot for more details. */
+  /** Whether the channel is considered ypp monetization enabled. */
   isChannelMonetizationEnabled?: boolean;
   /**
    * If true, then the user is linked to either a YouTube username or G+ account. Otherwise, the user
@@ -969,13 +969,13 @@ export interface ChannelStatus {
 /** Information specific to a creator in an affiliate program linked to a YouTube channel. */
 export interface ChannelToAffiliateProgramLinkDetails {
   /**
-   * Required. Google Merchant Center ID of the partner.
+   * Google Merchant Center ID of the partner.
    *
    * A 64-bit integer, sent as a string.
    */
   merchantId?: string;
   /**
-   * Required. Affiliate program status.
+   * Affiliate program status.
    *
    * - `affiliateProgramStatusUnspecified`: Unspecified status.
    * - `active`: Channel is active in the affiliate program.
@@ -1048,7 +1048,7 @@ export interface ChannelTopicDetails {
  * to the parts you asked for.
  */
 export interface CommentResource {
-  /** Identifies what kind of resource this is. Value: the fixed string "youtube#comment". */
+  /** Identifies what kind of resource this is. Value: the fixed string "youtube#comment. */
   kind?: string;
   /** Etag of this resource. */
   etag?: string;
@@ -1060,7 +1060,7 @@ export interface CommentResource {
 
 export interface CommentListResponse {
   /**
-   * Identifies what kind of resource this is. Value: the fixed string "youtube#commentListResponse".
+   * Identifies what kind of resource this is. Value: the fixed string "youtube#commentListResponse.
    */
   kind: string;
   /** Etag of this resource. */
@@ -1140,7 +1140,7 @@ export interface CommentSnippet {
    * be returned if it is accessible to the viewer, which is only guaranteed if the viewer is the
    * comment's author.
    */
-  textOriginal: string;
+  textOriginal?: string;
   /**
    * The date and time when the comment was last updated.
    *
@@ -1174,7 +1174,7 @@ export interface CommentSnippetAuthorChannelId {
  * narrowed to the parts you asked for.
  */
 export interface CommentThreadResource {
-  /** Identifies what kind of resource this is. Value: the fixed string "youtube#commentThread". */
+  /** Identifies what kind of resource this is. Value: the fixed string "youtube#commentThread. */
   kind?: string;
   /** Etag of this resource. */
   etag?: string;
@@ -1194,7 +1194,7 @@ export interface CommentThreadResource {
 export interface CommentThreadListResponse {
   /**
    * Identifies what kind of resource this is. Value: the fixed string
-   * "youtube#commentThreadListResponse".
+   * "youtube#commentThreadListResponse.
    */
   kind: string;
   /** Etag of this resource. */
@@ -1228,7 +1228,7 @@ export interface CommentThreadReplies {
    * A limited number of replies. Unless the number of replies returned equals total_reply_count in the
    * snippet the returned replies are only a subset of the total number of replies.
    */
-  comments: CommentResource[];
+  comments: Comment<"snippet">[];
 }
 
 /** Basic details about a comment thread. */
@@ -1246,7 +1246,7 @@ export interface CommentThreadSnippet {
   /** Whether the thread (and therefore all its comments) is visible to all YouTube users. */
   isPublic: boolean;
   /** The top level comment of this thread. */
-  topLevelComment: CommentResource;
+  topLevelComment: Comment<"snippet">;
   /** The total number of replies (not including the top level comment). */
   totalReplyCount: number;
   /** The ID of the video the comments refer to, if any. */
@@ -2050,7 +2050,7 @@ export interface CuepointSchedule {
    * The strategy to use when scheduling cuepoints.
    *
    * - `concurrent`: Strategy to schedule cuepoints at one time for all viewers.
-   * - `nonConcurrent`: Strategy to schedule cuepoints at an increased rate to allow viewers to receive cuepoints when eligible. See go/lcr-non-concurrent-ads for more details.
+   * - `nonConcurrent`: Strategy to schedule cuepoints at an increased rate to allow viewers to receive cuepoints when eligible.
    * @deprecated
    */
   scheduleStrategy?: "scheduleStrategyUnspecified" | "concurrent" | "nonConcurrent";
@@ -2079,7 +2079,7 @@ export interface GeoPoint {
  * narrowed to the parts you asked for.
  */
 export interface I18nLanguageResource {
-  /** Identifies what kind of resource this is. Value: the fixed string "youtube#i18nLanguage". */
+  /** Identifies what kind of resource this is. Value: the fixed string "youtube#i18nLanguage. */
   kind?: string;
   /** Etag of this resource. */
   etag?: string;
@@ -2095,7 +2095,7 @@ export interface I18nLanguageResource {
 export interface I18nLanguageListResponse {
   /**
    * Identifies what kind of resource this is. Value: the fixed string
-   * "youtube#i18nLanguageListResponse".
+   * "youtube#i18nLanguageListResponse.
    */
   kind: string;
   /** Etag of this resource. */
@@ -2126,7 +2126,7 @@ export interface I18nLanguageSnippet {
  * narrowed to the parts you asked for.
  */
 export interface I18nRegionResource {
-  /** Identifies what kind of resource this is. Value: the fixed string "youtube#i18nRegion". */
+  /** Identifies what kind of resource this is. Value: the fixed string "youtube#i18nRegion. */
   kind?: string;
   /** Etag of this resource. */
   etag?: string;
@@ -2141,8 +2141,7 @@ export interface I18nRegionResource {
 
 export interface I18nRegionListResponse {
   /**
-   * Identifies what kind of resource this is. Value: the fixed string
-   * "youtube#i18nRegionListResponse".
+   * Identifies what kind of resource this is. Value: the fixed string "youtube#i18nRegionListResponse.
    */
   kind: string;
   /** Etag of this resource. */
@@ -2409,7 +2408,7 @@ export interface LevelDetails {
  * narrowed to the parts you asked for.
  */
 export interface LiveBroadcastResource {
-  /** Identifies what kind of resource this is. Value: the fixed string "youtube#liveBroadcast". */
+  /** Identifies what kind of resource this is. Value: the fixed string "youtube#liveBroadcast. */
   kind?: string;
   /** Etag of this resource. */
   etag?: string;
@@ -2542,7 +2541,7 @@ export interface LiveBroadcastContentDetails {
 export interface LiveBroadcastListResponse {
   /**
    * Identifies what kind of resource this is. Value: the fixed string
-   * "youtube#liveBroadcastListResponse".
+   * "youtube#liveBroadcastListResponse.
    */
   kind: string;
   /** Etag of this resource. */
@@ -2668,7 +2667,6 @@ export interface LiveBroadcastStatus {
    * - `created`: Incomplete settings, but otherwise valid.
    * - `ready`: Complete settings.
    * - `testing`: Visible only to partner, may need special UI treatment.
-   * - `live`: Viper is recording; this means the "clock" is running.
    * - `complete`: The broadcast is finished.
    * - `revoked`: This broadcast was removed by admin action.
    * - `testStarting`: Transition into TESTING has been requested.
@@ -2680,7 +2678,6 @@ export interface LiveBroadcastStatus {
    *
    * - `low`: Low priority broadcast: for low view count HoAs or other low priority broadcasts.
    * - `normal`: Normal priority broadcast: for regular HoAs and broadcasts.
-   * - `high`: High priority broadcast: for high profile HoAs, like PixelCorp ones.
    */
   liveBroadcastPriority?: "liveBroadcastPriorityUnspecified" | "low" | "normal" | "high";
   /**
@@ -2704,15 +2701,11 @@ export interface LiveBroadcastStatus {
    * - `recorded`: The recording is completed, and cannot be started again.
    */
   recordingStatus: "liveBroadcastRecordingStatusUnspecified" | "notRecording" | "recording" | "recorded";
-  /**
-   * This field will be set to True if the creator declares the broadcast to be kids only:
-   * go/live-cw-work.
-   */
   selfDeclaredMadeForKids?: boolean;
 }
 
 /**
- * A `__liveChatBan__` resource represents a ban for a YouTube live chat.
+ * A ban of a user from a live chat, permanent or temporary.
  *
  * This is the full resource, with every part optional. `LiveChatBan<Parts>` is the same resource
  * narrowed to the parts you asked for.
@@ -2769,7 +2762,11 @@ export interface LiveChatGiftDetails {
   altText?: string;
   /** The number of times the gift has been sent in a row. */
   comboCount?: number;
-  /** The duration of the gift. */
+  /**
+   * The duration of the gift.
+   *
+   * A number of seconds followed by `s`, for example `212s`. `parseDuration` reads it.
+   */
   giftDuration?: string;
   /** The name of the gift. */
   giftName?: string;
@@ -2838,7 +2835,7 @@ export interface LiveChatMembershipGiftingDetails {
  * narrowed to the parts you asked for.
  */
 export interface LiveChatMessageResource {
-  /** Identifies what kind of resource this is. Value: the fixed string "youtube#liveChatMessage". */
+  /** Identifies what kind of resource this is. Value: the fixed string "youtube#liveChatMessage. */
   kind?: string;
   /** Etag of this resource. */
   etag?: string;
@@ -2865,7 +2862,7 @@ export interface LiveChatMessageAuthorDetails {
   isChatSponsor: boolean;
   /** Whether the author's identity has been verified by YouTube. */
   isVerified: boolean;
-  /** The channels's avatar URL. */
+  /** The channel's avatar URL. */
   profileImageUrl: string;
 }
 
@@ -2876,7 +2873,7 @@ export interface LiveChatMessageDeletedDetails {
 export interface LiveChatMessageListResponse {
   /**
    * Identifies what kind of resource this is. Value: the fixed string
-   * "youtube#liveChatMessageListResponse".
+   * "youtube#liveChatMessageListResponse.
    */
   kind: string;
   /** Etag of this resource. */
@@ -2962,13 +2959,13 @@ export interface LiveChatMessageSnippet {
   messageRetractedDetails?: LiveChatMessageRetractedDetails;
   /**
    * Details about the New Member Announcement event, this is only set if the type is
-   * 'newSponsorEvent'. Please note that "member" is the new term for "sponsor".
+   * 'newSponsorEvent'. Please note that "member" is the new term for "sponsor.
    */
   newSponsorDetails?: LiveChatNewSponsorDetails;
   /** Details about the poll event, this is only set if the type is 'pollEvent'. */
   pollDetails?: LiveChatPollDetails;
   /**
-   * The date and time when the message was orignally published.
+   * The date and time when the message was originally published.
    *
    * ISO 8601 date and time.
    */
@@ -2997,9 +2994,7 @@ export interface LiveChatMessageSnippet {
  * narrowed to the parts you asked for.
  */
 export interface LiveChatModeratorResource {
-  /**
-   * Identifies what kind of resource this is. Value: the fixed string "youtube#liveChatModerator".
-   */
+  /** Identifies what kind of resource this is. Value: the fixed string "youtube#liveChatModerator. */
   kind?: string;
   /** Etag of this resource. */
   etag?: string;
@@ -3012,7 +3007,7 @@ export interface LiveChatModeratorResource {
 export interface LiveChatModeratorListResponse {
   /**
    * Identifies what kind of resource this is. Value: the fixed string
-   * "youtube#liveChatModeratorListResponse".
+   * "youtube#liveChatModeratorListResponse.
    */
   kind: string;
   /** Etag of this resource. */
@@ -3145,7 +3140,7 @@ export interface LiveChatUserBannedMessageDetails {
  * narrowed to the parts you asked for.
  */
 export interface LiveStreamResource {
-  /** Identifies what kind of resource this is. Value: the fixed string "youtube#liveStream". */
+  /** Identifies what kind of resource this is. Value: the fixed string "youtube#liveStream. */
   kind?: string;
   /** Etag of this resource. */
   etag?: string;
@@ -3214,8 +3209,7 @@ export interface LiveStreamHealthStatus {
 
 export interface LiveStreamListResponse {
   /**
-   * Identifies what kind of resource this is. Value: the fixed string
-   * "youtube#liveStreamListResponse".
+   * Identifies what kind of resource this is. Value: the fixed string "youtube#liveStreamListResponse.
    */
   kind: string;
   /** Etag of this resource. */
@@ -3290,7 +3284,7 @@ export interface LocalizedString {
  * to the parts you asked for.
  */
 export interface MemberResource {
-  /** Identifies what kind of resource this is. Value: the fixed string "youtube#member". */
+  /** Identifies what kind of resource this is. Value: the fixed string "youtube#member. */
   kind?: string;
   /** Etag of this resource. */
   etag?: string;
@@ -3300,7 +3294,7 @@ export interface MemberResource {
 
 export interface MemberListResponse {
   /**
-   * Identifies what kind of resource this is. Value: the fixed string "youtube#memberListResponse".
+   * Identifies what kind of resource this is. Value: the fixed string "youtube#memberListResponse.
    */
   kind: string;
   /** Etag of this resource. */
@@ -3385,7 +3379,7 @@ export interface MembershipsDurationAtLevel {
 export interface MembershipsLevelResource {
   /**
    * Identifies what kind of resource this is. Value: the fixed string
-   * "youtube#membershipsLevelListResponse".
+   * "youtube#membershipsLevelListResponse.
    */
   kind?: string;
   /** Etag of this resource. */
@@ -3399,7 +3393,7 @@ export interface MembershipsLevelResource {
 export interface MembershipsLevelListResponse {
   /**
    * Identifies what kind of resource this is. Value: the fixed string
-   * "youtube#membershipsLevelListResponse".
+   * "youtube#membershipsLevelListResponse.
    */
   kind: string;
   /** Etag of this resource. */
@@ -3473,7 +3467,7 @@ export interface PageInfo {
  * to the parts you asked for.
  */
 export interface PlaylistResource {
-  /** Identifies what kind of resource this is. Value: the fixed string "youtube#playlist". */
+  /** Identifies what kind of resource this is. Value: the fixed string "youtube#playlist. */
   kind?: string;
   /** Etag of this resource. */
   etag?: string;
@@ -3506,7 +3500,7 @@ export interface PlaylistContentDetails {
  * narrowed to the parts you asked for.
  */
 export interface PlaylistImageResource {
-  /** Identifies what kind of resource this is. Value: the fixed string "youtube#playlistImages". */
+  /** Identifies what kind of resource this is. Value: the fixed string "youtube#playlistImages. */
   kind?: string;
   /** Identifies this resource (playlist id and image type). */
   id?: string;
@@ -3516,7 +3510,7 @@ export interface PlaylistImageResource {
 export interface PlaylistImageListResponse {
   /**
    * Identifies what kind of resource this is. Value: the fixed string
-   * "youtube#playlistImageListResponse".
+   * "youtube#playlistImageListResponse.
    */
   kind: string;
   items: PlaylistImageResource[];
@@ -3579,7 +3573,7 @@ export interface PlaylistImageSnippet {
  * narrowed to the parts you asked for.
  */
 export interface PlaylistItemResource {
-  /** Identifies what kind of resource this is. Value: the fixed string "youtube#playlistItem". */
+  /** Identifies what kind of resource this is. Value: the fixed string "youtube#playlistItem. */
   kind?: string;
   /** Etag of this resource. */
   etag?: string;
@@ -3633,7 +3627,7 @@ export interface PlaylistItemContentDetails {
 export interface PlaylistItemListResponse {
   /**
    * Identifies what kind of resource this is. Value: the fixed string
-   * "youtube#playlistItemListResponse".
+   * "youtube#playlistItemListResponse.
    */
   kind: string;
   etag: string;
@@ -3669,7 +3663,7 @@ export interface PlaylistItemSnippet {
   channelTitle: string;
   /** The item's description. */
   description: string;
-  /** The ID that YouTube uses to uniquely identify thGe playlist that the playlist item is in. */
+  /** The ID that YouTube uses to uniquely identify the playlist that the playlist item is in. */
   playlistId: string;
   /**
    * The order in which the item appears in the playlist. The value uses a zero-based index, so the
@@ -3709,7 +3703,7 @@ export interface PlaylistItemStatus {
 
 export interface PlaylistListResponse {
   /**
-   * Identifies what kind of resource this is. Value: the fixed string "youtube#playlistListResponse".
+   * Identifies what kind of resource this is. Value: the fixed string "youtube#playlistListResponse.
    */
   kind: string;
   /** Etag of this resource. */
@@ -3839,7 +3833,7 @@ export interface ResourceId {
 
 export interface SearchListResponse {
   /**
-   * Identifies what kind of resource this is. Value: the fixed string "youtube#searchListResponse".
+   * Identifies what kind of resource this is. Value: the fixed string "youtube#searchListResponse.
    */
   kind: string;
   /** Etag of this resource. */
@@ -3875,7 +3869,7 @@ export interface SearchListResponse {
  * narrowed to the parts you asked for.
  */
 export interface SearchResultResource {
-  /** Identifies what kind of resource this is. Value: the fixed string "youtube#searchResult". */
+  /** Identifies what kind of resource this is. Value: the fixed string "youtube#searchResult. */
   kind?: string;
   /** Etag of this resource. */
   etag?: string;
@@ -3941,7 +3935,7 @@ export interface SearchResultSnippet {
  * narrowed to the parts you asked for.
  */
 export interface SubscriptionResource {
-  /** Identifies what kind of resource this is. Value: the fixed string "youtube#subscription". */
+  /** Identifies what kind of resource this is. Value: the fixed string "youtube#subscription. */
   kind?: string;
   /** Etag of this resource. */
   etag?: string;
@@ -3971,7 +3965,7 @@ export interface SubscriptionContentDetails {
 export interface SubscriptionListResponse {
   /**
    * Identifies what kind of resource this is. Value: the fixed string
-   * "youtube#subscriptionListResponse".
+   * "youtube#subscriptionListResponse.
    */
   kind: string;
   /** Etag of this resource. */
@@ -4046,7 +4040,7 @@ export interface SubscriptionSubscriberSnippet {
 }
 
 /**
- * A `__superChatEvent__` resource represents a Super Chat purchase on a YouTube channel.
+ * A Super Chat or Super Sticker purchased during one of your live broadcasts.
  *
  * This is the full resource, with every part optional. `SuperChatEvent<Parts>` is the same resource
  * narrowed to the parts you asked for.
@@ -4065,7 +4059,7 @@ export interface SuperChatEventResource {
 export interface SuperChatEventListResponse {
   /**
    * Identifies what kind of resource this is. Value: the fixed string
-   * "youtube#superChatEventListResponse".
+   * "youtube#superChatEventListResponse.
    */
   kind: string;
   /** Etag of this resource. */
@@ -4153,7 +4147,7 @@ export interface SuperStickerMetadata {
  * narrowed to the parts you asked for.
  */
 export interface ThirdPartyLinkResource {
-  /** Identifies what kind of resource this is. Value: the fixed string "youtube#thirdPartyLink". */
+  /** Identifies what kind of resource this is. Value: the fixed string "youtube#thirdPartyLink. */
   kind?: string;
   /** Etag of this resource. */
   etag?: string;
@@ -4171,7 +4165,7 @@ export interface ThirdPartyLinkResource {
 export interface ThirdPartyLinkListResponse {
   /**
    * Identifies what kind of resource this is. Value: the fixed string
-   * "youtube#thirdPartyLinkListResponse".
+   * "youtube#thirdPartyLinkListResponse.
    */
   kind: string;
   /** Etag of this resource. */
@@ -4234,7 +4228,7 @@ export interface ThumbnailDetails {
 
 export interface ThumbnailSetResponse {
   /**
-   * Identifies what kind of resource this is. Value: the fixed string "youtube#thumbnailSetResponse".
+   * Identifies what kind of resource this is. Value: the fixed string "youtube#thumbnailSetResponse.
    */
   kind?: string;
   /** Etag of this resource. */
@@ -4264,7 +4258,7 @@ export interface TokenPagination {
  * the parts you asked for.
  */
 export interface VideoResource {
-  /** Identifies what kind of resource this is. Value: the fixed string "youtube#video". */
+  /** Identifies what kind of resource this is. Value: the fixed string "youtube#video. */
   kind?: string;
   /** Etag of this resource. */
   etag?: string;
@@ -4371,8 +4365,8 @@ export interface VideoAbuseReport {
 }
 
 /**
- * A `__videoAbuseReportReason__` resource identifies a reason that a video could be reported as
- * abusive. Video abuse report reasons are used with `video.ReportAbuse`.
+ * A `videoAbuseReportReason` resource identifies a reason that a video could be reported as abusive.
+ * Video abuse report reasons are used with `video.ReportAbuse`.
  *
  * This is the full resource, with every part optional. `VideoAbuseReportReason<Parts>` is the same
  * resource narrowed to the parts you asked for.
@@ -4413,7 +4407,7 @@ export interface VideoAbuseReportReasonListResponse {
   visitorId?: string;
 }
 
-/** Basic details about a video category, such as its localized title. */
+/** The label of a reason for reporting a video, and its secondary reasons. */
 export interface VideoAbuseReportReasonSnippet {
   /** The localized label belonging to this abuse report reason. */
   label: string;
@@ -4455,7 +4449,7 @@ export interface VideoAgeGating {
  * narrowed to the parts you asked for.
  */
 export interface VideoCategoryResource {
-  /** Identifies what kind of resource this is. Value: the fixed string "youtube#videoCategory". */
+  /** Identifies what kind of resource this is. Value: the fixed string "youtube#videoCategory. */
   kind?: string;
   /** Etag of this resource. */
   etag?: string;
@@ -4468,7 +4462,7 @@ export interface VideoCategoryResource {
 export interface VideoCategoryListResponse {
   /**
    * Identifies what kind of resource this is. Value: the fixed string
-   * "youtube#videoCategoryListResponse".
+   * "youtube#videoCategoryListResponse.
    */
   kind: string;
   /** Etag of this resource. */
@@ -4696,8 +4690,7 @@ export interface VideoFileDetailsVideoStream {
 
 export interface VideoGetRatingResponse {
   /**
-   * Identifies what kind of resource this is. Value: the fixed string
-   * "youtube#videoGetRatingResponse".
+   * Identifies what kind of resource this is. Value: the fixed string "youtube#videoGetRatingResponse.
    */
   kind: string;
   /** Etag of this resource. */
@@ -4717,9 +4710,7 @@ export interface VideoGetRatingResponse {
 }
 
 export interface VideoListResponse {
-  /**
-   * Identifies what kind of resource this is. Value: the fixed string "youtube#videoListResponse".
-   */
+  /** Identifies what kind of resource this is. Value: the fixed string "youtube#videoListResponse. */
   kind: string;
   /** Etag of this resource. */
   etag: string;
@@ -4819,10 +4810,6 @@ export interface VideoMonetizationDetails {
  * by the video owner.
  */
 export interface VideoPaidProductPlacementDetails {
-  /**
-   * This boolean represents whether the video contains Paid Product Placement, Studio equivalent:
-   * https://screenshot.googleplex.com/4Me79DE6AfT2ktp.png.
-   */
   hasPaidProductPlacement?: boolean;
 }
 
@@ -5005,7 +4992,7 @@ export interface VideoSnippet {
 export interface VideoStatResource {
   /**
    * Output only. Identifies what kind of resource this is. Value: the fixed string
-   * "youtube#videoStats".
+   * "youtube#videoStats.
    */
   kind?: string;
   /** Output only. Etag of this resource. */
@@ -5071,6 +5058,8 @@ export interface VideoStatsContentDetails {
    * Output only. The length of the video. The property value is a
    * [`google.protobuf.Duration`](https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration)
    * object.
+   *
+   * A number of seconds followed by `s`, for example `212s`. `parseDuration` reads it.
    */
   duration?: string;
 }
@@ -5113,7 +5102,7 @@ export interface VideoStatsStatistics {
   viewCount: string;
 }
 
-/** Basic details about a video category, such as its localized title. */
+/** The upload, processing and privacy status of a video. */
 export interface VideoStatus {
   /** Indicates if the video contains altered or synthetic media. */
   containsSyntheticMedia?: boolean;
@@ -5249,9 +5238,7 @@ export interface VideoTopicDetails {
 
 /** Specifies who is allowed to train on the video. */
 export interface VideoTrainability {
-  /**
-   * Identifies what kind of resource this is. Value: the fixed string "youtube#videoTrainability".
-   */
+  /** Identifies what kind of resource this is. Value: the fixed string "youtube#videoTrainability. */
   kind?: string;
   /** Etag of this resource. */
   etag?: string;

@@ -1,11 +1,23 @@
-type Listener<T> = (payload: T) => void;
+type Listener<T> = (payload: T) => void | Promise<void>;
 
-/** A small typed event emitter. A listener that throws never breaks the emitter. */
+/**
+ * A small typed event emitter. A listener that throws, or whose promise
+ * rejects, never breaks the emitter: the failure goes to the `error` event.
+ */
 export class Emitter<Events extends object> {
   readonly #listeners = new Map<keyof Events, Set<Listener<never>>>();
+  readonly #wrapError: (error: unknown) => unknown;
+
+  /**
+   * @param wrapError - Shapes what a failing listener sends to the `error`
+   * event, for emitters whose `error` payload is not the bare error.
+   */
+  constructor(wrapError: (error: unknown) => unknown = (error) => error) {
+    this.#wrapError = wrapError;
+  }
 
   /** Subscribes to an event. Returns a function that unsubscribes. */
-  on<K extends keyof Events>(event: K, listener: Listener<Events[K]>): () => void {
+  on<K extends keyof Events>(event: K, listener: (payload: Events[K]) => void): () => void {
     let set = this.#listeners.get(event);
     if (!set) this.#listeners.set(event, (set = new Set()));
     set.add(listener as Listener<never>);
@@ -13,16 +25,16 @@ export class Emitter<Events extends object> {
   }
 
   /** Subscribes for a single occurrence. */
-  once<K extends keyof Events>(event: K, listener: Listener<Events[K]>): () => void {
+  once<K extends keyof Events>(event: K, listener: (payload: Events[K]) => void): () => void {
     const off = this.on(event, (payload) => {
       off();
-      listener(payload);
+      return listener(payload);
     });
     return off;
   }
 
   /** Removes a listener. */
-  off<K extends keyof Events>(event: K, listener: Listener<Events[K]>): void {
+  off<K extends keyof Events>(event: K, listener: (payload: Events[K]) => void): void {
     this.#listeners.get(event)?.delete(listener as Listener<never>);
   }
 
@@ -37,13 +49,18 @@ export class Emitter<Events extends object> {
     if (!set) return;
     for (const listener of [...set]) {
       try {
-        (listener as Listener<Events[K]>)(payload);
+        const result = (listener as Listener<Events[K]>)(payload);
+        // An async listener fails later: catch that too, or it becomes an unhandled rejection.
+        if (result && typeof result.then === "function") result.then(undefined, (error: unknown) => this.#report(event, error));
       } catch (error) {
-        // An "error" listener that throws must not loop back into itself.
-        if (event !== "error" && this.#listeners.get("error" as keyof Events)?.size) {
-          this.emit("error" as K, error as Events[K]);
-        }
+        this.#report(event, error);
       }
     }
+  }
+
+  #report(event: keyof Events, error: unknown): void {
+    // An "error" listener that fails must not loop back into itself.
+    if (event === "error" || !this.hasListeners("error" as keyof Events)) return;
+    this.emit("error" as keyof Events, this.#wrapError(error) as Events[keyof Events]);
   }
 }

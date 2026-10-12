@@ -139,3 +139,28 @@ export function durationsAreChecked() {
   // @ts-expect-error not a duration
   yt.watch("@x", { interval: "five minutes" });
 }
+
+export async function aResourceWithOnePartIsNarrowedToo() {
+  const member = (await yt.members.list({ part: "snippet" }).first())!;
+  // Asking for the only part there is must not fall back on "everything optional".
+  assert<Equal<undefined extends typeof member.snippet ? true : false, false>>();
+  assert<Equal<typeof member.etag, string>>();
+
+  const reason = (await yt.videoAbuseReportReasons.list({ part: ["id", "snippet"] }).first())!;
+  assert<Equal<typeof reason.snippet.label, string>>();
+}
+
+export async function nestedCommentsCarryTheirSnippet() {
+  for await (const thread of yt.commentThreads.forVideo("x", { part: ["snippet", "replies"] })) {
+    assert<Equal<typeof thread.snippet.topLevelComment.snippet.textDisplay, string>>();
+    assert<Equal<typeof thread.snippet.topLevelComment.snippet.textOriginal, string | undefined>>();
+    const reply = thread.replies?.comments[0];
+    assert<Equal<typeof reply extends undefined ? never : NonNullable<typeof reply>["snippet"]["authorDisplayName"], string>>();
+  }
+}
+
+export async function analyticsSortStaysWithinTheQuery() {
+  await yt.analytics.query({ startDate: "2026-01-01", endDate: "2026-01-31", metrics: ["views"], dimensions: "day", sort: "-views" });
+  // @ts-expect-error likes is not among the metrics of this query
+  await yt.analytics.query({ startDate: "2026-01-01", endDate: "2026-01-31", metrics: ["views"], sort: "-likes" });
+}

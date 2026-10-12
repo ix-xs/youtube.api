@@ -70,7 +70,7 @@ export interface CollectOptions {
    * Stop once this many items were fetched. Without it, every page is
    * fetched. `pages()` yields whole pages, so the last one can go past the limit.
    */
-  limit?: number;
+  limit?: number | undefined;
 }
 
 function chunkOf<V>(values: readonly V[], size: number): V[][] {
@@ -108,14 +108,20 @@ export class ListRequest<T, R = unknown> implements PromiseLike<Page<T, R>>, Asy
   readonly #spec: MethodSpec;
   readonly #source: Params | (() => Promise<Params>);
   readonly #options: RequestOptions | undefined;
+  readonly #fullPages: boolean;
   #resolved: Promise<Params> | undefined;
 
-  /** @internal */
-  constructor(rest: Rest, spec: MethodSpec, params: Params | (() => Promise<Params>), options?: RequestOptions) {
+  /**
+   * @internal
+   * @param fullPages - Ask for the largest page even when a single page is
+   * awaited. The helpers use it: a page costs the same whatever its size.
+   */
+  constructor(rest: Rest, spec: MethodSpec, params: Params | (() => Promise<Params>), options?: RequestOptions, fullPages = false) {
     this.#rest = rest;
     this.#spec = spec;
     this.#source = params;
     this.#options = options;
+    this.#fullPages = fullPages;
   }
 
   /** The parameters, once anything they depend on (a handle to resolve, for instance) is known. */
@@ -163,7 +169,7 @@ export class ListRequest<T, R = unknown> implements PromiseLike<Page<T, R>>, Asy
   async page(): Promise<Page<T, R>> {
     const params = await this.#input();
     const chunks = this.#chunks(params);
-    if (!chunks) return this.#fetch(params);
+    if (!chunks) return this.#fetch(this.#fullPages ? this.#walkParams(params, undefined) : params);
     const param = this.#spec.chunk!.param;
     const raws: R[] = new Array(chunks.length);
     let cursor = 0;
@@ -175,24 +181,29 @@ export class ListRequest<T, R = unknown> implements PromiseLike<Page<T, R>>, Asy
     };
     await Promise.all(Array.from({ length: Math.min(4, chunks.length) }, worker));
     const items = raws.flatMap((raw) => this.#itemsOf(raw));
-    return new Page<T, R>(raws[0]!, items);
+    // The body is the first call's, with counts that describe the merged list.
+    const merged = { ...(raws[0] as object), pageInfo: { totalResults: items.length, resultsPerPage: items.length } } as R;
+    return new Page<T, R>(merged, items);
   }
 
   /** Walks the pages one by one. */
   async *pages(options: CollectOptions = {}): AsyncGenerator<Page<T, R>, void, undefined> {
     const params = await this.#input();
     const chunks = this.#chunks(params);
+    const limit = options.limit ?? Number.POSITIVE_INFINITY;
+    if (limit <= 0) return;
+    let seen = 0;
     if (chunks) {
       const param = this.#spec.chunk!.param;
       for (const chunk of chunks) {
         const raw = await this.#rest.request<R>(this.#spec, { ...params, [param]: chunk }, this.#options);
-        yield new Page<T, R>(raw, this.#itemsOf(raw));
+        const page = new Page<T, R>(raw, this.#itemsOf(raw));
+        yield page;
+        seen += page.items.length;
+        if (seen >= limit) return;
       }
       return;
     }
-    const limit = options.limit ?? Number.POSITIVE_INFINITY;
-    if (limit <= 0) return;
-    let seen = 0;
     let page: Page<T, R> | null = await this.#fetch(this.#walkParams(params, options.limit));
     while (page) {
       yield page;

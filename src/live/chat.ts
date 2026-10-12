@@ -79,24 +79,25 @@ export class LiveChatMessages extends LiveChatMessagesApi {
 /** Options of {@link LiveChat.messages} and {@link LiveChat.listen}. */
 export interface ChatReadOptions {
   /** Stops reading. */
-  signal?: AbortSignal;
+  signal?: AbortSignal | undefined;
   /**
    * Also deliver the messages already in the chat when reading starts.
    * Default false: only messages posted from now on.
    */
-  history?: boolean;
+  history?: boolean | undefined;
   /**
    * Never ask more often than this, even when YouTube allows it. Each request
    * costs 5 units, so a slower pace stretches the quota. Default: the pace
-   * YouTube gives, a few seconds.
+   * YouTube gives, a few seconds. In `"stream"` mode it is the pause before
+   * reconnecting when the connection closes.
    */
-  minInterval?: Duration;
+  minInterval?: Duration | undefined;
   /** Size in pixels of the authors' profile pictures, between 16 and 720. */
-  profileImageSize?: number;
+  profileImageSize?: number | undefined;
   /** Language of the system messages, for example `"fr"`. */
-  hl?: string;
+  hl?: string | undefined;
   /** `"poll"` (default) asks again at the pace YouTube gives. `"stream"` keeps one connection open, experimental. */
-  mode?: "poll" | "stream";
+  mode?: "poll" | "stream" | undefined;
 }
 
 /** Handle returned by {@link LiveChat.listen}. */
@@ -239,7 +240,7 @@ export class LiveChat {
    * @example
    * await chat.ban(message.authorDetails.channelId, { duration: "5m" });
    */
-  ban(channelId: string, options: RequestOptions & { duration?: Duration } = {}): Promise<LiveChatBan<"snippet">> {
+  ban(channelId: string, options: RequestOptions & { duration?: Duration | undefined } = {}): Promise<LiveChatBan<"snippet">> {
     const { duration, ...request } = options;
     const snippet: Record<string, unknown> = { liveChatId: this.id, type: duration === undefined ? "permanent" : "temporary", bannedUserDetails: { channelId } };
     if (duration !== undefined) snippet.banDurationSeconds = String(Math.max(1, Math.round(toMs(duration) / 1000)));

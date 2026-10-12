@@ -17,6 +17,8 @@ export default defineConfig({
   target: "es2022",
   platform: "neutral",
   external: [/^node:/],
+  // Keep "node:fs" as written: Deno and the edge runtimes only know the prefixed names.
+  removeNodeProtocol: false,
   outExtension({ format }) {
     return { js: format === "esm" ? ".mjs" : ".js" };
   },

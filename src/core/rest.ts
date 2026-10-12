@@ -37,6 +37,8 @@ export interface MethodSpec {
   /** Key of the array in a list response. Default `items`. */
   readonly items?: string;
   readonly upload?: { readonly path: string; readonly accept: readonly string[]; readonly maxSize: number };
+  /** Whether the method takes `onBehalfOfContentOwner`. */
+  readonly owner?: boolean;
   /** A write whose `part` defaults to the parts present in its body. */
   readonly autoPart?: boolean;
   /** Shape of a successful answer. Default `json`. */
@@ -46,11 +48,15 @@ export interface MethodSpec {
 /** Retry policy. */
 export interface RetryOptions {
   /** Retries after the first attempt. Default 3. Use 0 to turn retries off. */
-  attempts?: number;
+  attempts?: number | undefined;
   /** First delay, doubled on each retry. Default `"500ms"`. */
-  delay?: Duration;
-  /** Upper bound of a single delay. Default `"30s"`. */
-  maxDelay?: Duration;
+  delay?: Duration | undefined;
+  /**
+   * Upper bound of a single delay. Default `"30s"`. When the API asks to wait
+   * longer than this (`Retry-After`), the call is not retried: the error is
+   * thrown with its `retryAfter`.
+   */
+  maxDelay?: Duration | undefined;
 }
 
 /** Options accepted as the last argument of every API call. */
@@ -86,7 +92,7 @@ export interface ClientEvents {
   retry: { method: string; attempt: number; delay: number; error: Error };
   /** Quota was charged. */
   quota: QuotaEvent;
-  /** A listener threw. */
+  /** A listener of yours threw, or the cache store failed. Neither stops the call that was running. */
   error: unknown;
 }
 
@@ -282,7 +288,7 @@ export class Rest {
       if (inPath.has(name)) path[name] = value;
       else query[name] = value;
     }
-    if (this.options.onBehalfOfContentOwner && spec.api !== "reporting" && query.onBehalfOfContentOwner === undefined) {
+    if (this.options.onBehalfOfContentOwner && spec.owner && query.onBehalfOfContentOwner === undefined) {
       query.onBehalfOfContentOwner = this.options.onBehalfOfContentOwner;
     }
     return { query, path, body, media: media as MediaInput | undefined };
@@ -296,7 +302,11 @@ export class Rest {
 
   /** Fails fast, before any quota is spent, when the credentials cannot possibly work. */
   async #headers(spec: MethodSpec, query: Params, options: RequestOptions | undefined): Promise<{ headers: Record<string, string>; token: string | undefined }> {
-    const headers: Record<string, string> = { accept: "application/json", ...this.options.headers, ...options?.headers };
+    const headers: Record<string, string> = { accept: "application/json" };
+    // Lower-cased, so a header given by the caller and one set here are the same key.
+    for (const source of [this.options.headers, options?.headers]) {
+      for (const [name, value] of Object.entries(source ?? {})) headers[name.toLowerCase()] = value;
+    }
     const needsOAuth = this.#needsOAuth(spec, query);
     // A token sees everything a key sees plus the user's private data, so it
     // wins when both are set. Without a usable token, a public read falls back on the key.
@@ -304,15 +314,19 @@ export class Rest {
 
     if (token) {
       const granted = this.oauth?.grantedScopes;
-      if (granted && spec.scopes.length && !options?.accessToken && !spec.scopes.some((scope) => granted.has(scope))) {
+      const lacking = granted !== undefined && spec.scopes.length > 0 && !options?.accessToken && !spec.scopes.some((scope) => granted.has(scope));
+      if (!lacking) {
+        headers.authorization = `Bearer ${token}`;
+        return { headers, token };
+      }
+      // A public read does not need the user: it goes out with the key instead.
+      if (needsOAuth || !this.options.apiKey) {
         throw new YouTubeAuthError(
           "INSUFFICIENT_SCOPE",
-          `${spec.id} needs one of these scopes: ${spec.scopes.join(", ")}. The current token only has: ${[...granted].join(", ") || "none"}. Send the user through the consent screen again with the missing scope.`,
+          `${spec.id} needs one of these scopes: ${spec.scopes.join(", ")}. The current token only has: ${[...granted!].join(", ") || "none"}. Send the user through the consent screen again with the missing scope.`,
           { scopes: spec.scopes },
         );
       }
-      headers.authorization = `Bearer ${token}`;
-      return { headers, token };
     }
     if (needsOAuth) {
       const why = spec.auth === "oauth" || spec.api !== "data" ? "always needs OAuth 2.0" : "needs OAuth 2.0 with the parameters you passed";
@@ -334,8 +348,10 @@ export class Rest {
    * users can never share an entry and no part of a token reaches the store.
    * Undefined when the runtime cannot hash, in which case nothing is cached.
    */
-  async #identity(token: string | undefined): Promise<string | undefined> {
-    if (token === undefined) return "key";
+  async #identity(accessToken: string | undefined, options: RequestOptions | undefined): Promise<string | undefined> {
+    if (accessToken === undefined) return "key";
+    // The refresh token outlives the access tokens: keyed on it, a user's entries survive a refresh.
+    const token = (!options?.accessToken && this.oauth?.tokens.refreshToken) || accessToken;
     const known = this.#identities.get(token);
     if (known) return known;
     const subtle = globalThis.crypto?.subtle;
@@ -384,7 +400,7 @@ export class Rest {
       return this.#budgeted(spec, () => this.#send<T>(spec, url, headers, body, options));
     }
 
-    const identity = await this.#identity(token);
+    const identity = await this.#identity(headers.authorization ? token : undefined, options);
     const cacheKey = `${identity}:${url}`;
     const ttl = identity === undefined ? false : this.#ttlFor(spec, options);
     if (ttl !== false && this.#cache) {
@@ -423,7 +439,9 @@ export class Rest {
   /**
    * Sends an authorized request and hands back the raw response, for bodies
    * that are streamed or are not JSON. `url` replaces the method's own URL
-   * when the API gave one (a report's download link, for instance).
+   * when the API gave one (a report's download link, for instance). One
+   * attempt, no timeout: the body can be long or endless, and the caller
+   * decides when to give up through `signal`.
    */
   async raw(spec: MethodSpec, params: Params, options?: RequestOptions, url?: string): Promise<Response> {
     const { query, path } = this.split(spec, params);
@@ -439,7 +457,13 @@ export class Rest {
         if (options?.signal?.aborted) throw new YouTubeRequestError("ABORTED", spec.id, "the request was aborted.", { cause });
         throw new YouTubeRequestError("NETWORK", spec.id, `network failure (${(cause as Error)?.message ?? cause}).`, { cause });
       }
-      if (!response.ok) throw this.#toError(spec, target, response, await response.text().catch(() => ""));
+      if (!response.ok) {
+        const error = this.#toError(spec, target, response, await response.text().catch(() => ""));
+        if (response.status >= 400 && response.status < 500 && response.status !== 401 && error.code !== "QUOTA_EXCEEDED") {
+          this.events.emit("quota", this.quota.charge(spec.id, spec.bucket, 1));
+        }
+        throw error;
+      }
       this.#account(spec, response.status, started);
       return response;
     });
@@ -465,6 +489,7 @@ export class Rest {
     const started = Date.now();
     const base = (spec.api === "data" ? (this.options.baseUrl ?? BASE_URLS.data) : BASE_URLS[spec.api]).replace(/\/$/, "");
     const url = this.buildUrl({ ...spec, path: spec.upload!.path.replace(/^\//, "") }, query, path, base);
+    this.events.emit("request", { method: spec.id, verb: spec.verb, url: redactUrl(url), attempt: 0 });
     const result = await upload<T>({
       fetch: this.#fetch,
       method: spec.id,
@@ -572,6 +597,8 @@ export class Rest {
         // replayed. A server error says nothing about a write: only reads are.
         retryable = error.code === "RATE_LIMITED" || (spec.verb === "GET" && response.status >= 500);
         wait = error.retryAfter !== undefined ? error.retryAfter * 1000 : undefined;
+        // Waiting longer than the caller allowed would hold the call hostage.
+        if (wait !== undefined && wait > retry.maxDelay) retryable = false;
       }
 
       if (!failure) failure = new YouTubeRequestError("NETWORK", spec.id, "no response.");

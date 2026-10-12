@@ -11,6 +11,9 @@ const ISO_DURATION = /^P(?:(\d+(?:\.\d+)?)W)?(?:(\d+(?:\.\d+)?)D)?(?:T(?:(\d+(?:
  * parseDuration("PT45S");    // 45
  */
 export function parseDuration(iso: string): number {
+  // The form `videos.batchGetStats` uses: a number of seconds and an "s".
+  const plain = /^(\d+(?:\.\d+)?)s$/.exec(iso);
+  if (plain) return Number(plain[1]);
   const match = ISO_DURATION.exec(iso);
   if (!match || iso === "P" || iso === "PT") throw new YouTubeArgumentError(`"${iso}" is not an ISO 8601 duration such as "PT4M13S".`);
   const [, weeks, days, hours, minutes, secs] = match;
@@ -42,12 +45,13 @@ export function formatDuration(duration: number | string, style: "clock" | "shor
 }
 
 /**
- * Formats a count the way YouTube shows it: `1.2M`, `34K`. Statistics come
+ * Formats a count the way YouTube shows it: `1.2M`, `34.1K`. Statistics come
  * back from the API as strings, so those are accepted as is.
  *
  * @example
- * formatCount("1234567");       // "1.2M"
- * formatCount(34_100, "fr");    // "34,1 k"
+ * formatCount("1234567");    // "1.2M"
+ * formatCount(34_100);       // "34.1K"
+ * formatCount(34_100, "fr"); // the same in French: 34,1 k, with the spacing French uses
  */
 export function formatCount(count: number | string, locale: string | string[] = "en"): string {
   const value = Number(count);

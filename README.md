@@ -61,7 +61,7 @@ It covers every method of the YouTube Data API v3 (82, live streaming included),
 | OAuth is a project of its own | **`OAuth2`**: consent URL with PKCE, code exchange, automatic refresh, device flow, and a one-call local flow for scripts |
 | Resumable uploads are a protocol to implement | **`media: file`**, with chunking, progress, retries and resume |
 | Live chat means a polling loop to write | **`for await (const message of chat.messages())`** |
-| "Tell me when this channel uploads" | **`yt.watch()`** by polling, or **`websub`** for push notifications. Neither needs quota |
+| "Tell me when this channel uploads" | **`yt.watch()`** by polling YouTube's free public feed, or **`websub`** for push notifications |
 | Errors are a status code and a blob | **`error.code` and `error.reason`**, both typed, plus `isQuotaExceeded`, `isRateLimited`, `isNotFound` |
 
 ## Typed by the parts you request
@@ -193,7 +193,7 @@ Reading works with an API key. `chat.send()`, `chat.ban()` and `chat.delete()` n
 
 ## New upload notifications
 
-Polling, with nothing to host. Reads the public feed, which costs no quota, and falls back on the API when the feed is down:
+Polling, with nothing to host. Reads the public feed, which costs no quota, and falls back on the API (1 unit per channel per round) when the feed is down:
 
 ```ts
 const watcher = yt.watch(["@GoogleDevelopers", "@YouTube"], { interval: "5m" });
