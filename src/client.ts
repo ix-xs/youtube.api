@@ -64,7 +64,11 @@ export interface YouTubeOptions {
   cache?: boolean | CacheOptions | undefined;
   /** Daily limits, optional enforcement and restored usage for the quota tracker. */
   quota?: QuotaOptions | undefined;
-  /** Retries on rate limits, server errors and network failures. Default: 3 retries with exponential backoff. `false` disables them. */
+  /**
+   * Retries with exponential backoff, 3 by default: on rate limits for every
+   * call, on server errors, timeouts and network failures for reads only,
+   * since a write may have been applied. `false` disables them.
+   */
   retry?: RetryOptions | false | undefined;
   /**
    * Time allowed for one attempt. Default `"30s"`, and `0` turns it off.

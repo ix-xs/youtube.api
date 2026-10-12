@@ -499,7 +499,7 @@ export class CommentThreadsApi extends ResourceBase {
    * @example
    * for await (const thread of yt.commentThreads.list({ part: ["snippet", "replies"], videoId, order: "relevance" })) {
    *   const top = thread.snippet.topLevelComment.snippet;
-   *   console.log(top?.authorDisplayName, top?.textDisplay, thread.snippet.totalReplyCount);
+   *   console.log(top.authorDisplayName, top.textDisplay, thread.snippet.totalReplyCount);
    * }
    * @see https://developers.google.com/youtube/v3/docs/commentThreads/list
    */

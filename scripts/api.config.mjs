@@ -107,12 +107,17 @@ export const schemaTypes = {
   "CommentThreadReplies.comments": 'Comment<"snippet">[]',
 };
 
-/** Descriptions of resources whose text in the API description is wrong or missing. */
+/**
+ * Descriptions of resources (`Schema`) and of their fields (`Schema.field`)
+ * whose text in the API description is wrong, outdated or missing.
+ */
 export const schemaDocs = {
   VideoStatus: "The upload, processing and privacy status of a video.",
   VideoAbuseReportReasonSnippet: "The label of a reason for reporting a video, and its secondary reasons.",
   SuperChatEvent: "A Super Chat or Super Sticker purchased during one of your live broadcasts.",
   LiveChatBan: "A ban of a user from a live chat, permanent or temporary.",
+  "CaptionSnippet.isAutoSynced":
+    "Whether YouTube timed the track to the audio itself. Tracks uploaded since April 2024 carry their own timing, so this is false for them: YouTube no longer syncs a transcript for you.",
 };
 
 const DATE = "string | Date";
@@ -283,7 +288,7 @@ console.log(channel?.snippet.title, channel?.statistics.subscriberCount);`,
     docs: { moderationStatus: "Only threads in this moderation state. `heldForReview` and `likelySpam` are only visible to the owner of the channel or video. Default `published`." },
     example: `for await (const thread of yt.commentThreads.list({ part: ["snippet", "replies"], videoId, order: "relevance" })) {
   const top = thread.snippet.topLevelComment.snippet;
-  console.log(top?.authorDisplayName, top?.textDisplay, thread.snippet.totalReplyCount);
+  console.log(top.authorDisplayName, top.textDisplay, thread.snippet.totalReplyCount);
 }`,
   },
   "youtube.commentThreads.insert": {
@@ -566,6 +571,7 @@ console.log(items[0]?.rating);`,
     summary: "Lists your broadcasts, by status or by id.",
     quota: 1,
     auth: "oauth",
+    docs: { mine: "Set to true to list the broadcasts of the authenticated user." },
     example: `const { items } = await yt.liveBroadcasts.list({ part: ["snippet", "status"], broadcastStatus: "upcoming" });`,
   },
   "youtube.liveBroadcasts.insert": {

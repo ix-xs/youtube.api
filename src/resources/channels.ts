@@ -148,7 +148,7 @@ export class Channels extends ChannelsApi {
    * without uploads, and throws a `YouTubeArgumentError` when no channel
    * matches the reference.
    *
-   * Quota: 2 units for up to 50 videos, plus 1 to resolve a handle the first time.
+   * Quota: 2 units for up to 50 videos, plus 1 to resolve a handle the first time (2 for a legacy username).
    *
    * @example
    * const videos = await yt.channels.latestVideos("@GoogleDevelopers", { limit: 3 });
@@ -175,7 +175,7 @@ export class Channels extends ChannelsApi {
   /**
    * Fetches the latest video of a channel, or `null` when it has none.
    *
-   * Quota: 2 units, plus 1 to resolve a handle the first time.
+   * Quota: 2 units, plus 1 to resolve a handle the first time (2 for a legacy username).
    *
    * @example
    * const video = await yt.channels.latestVideo("@GoogleDevelopers");

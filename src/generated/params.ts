@@ -454,6 +454,7 @@ export interface LiveBroadcastsListParams<P extends LiveBroadcastPart = LiveBroa
    * Between 0 and 50. Default 5.
    */
   maxResults?: number | undefined;
+  /** Set to true to list the broadcasts of the authenticated user. */
   mine?: boolean | undefined;
   /**
    * The `pageToken` parameter identifies a specific page in the result set that should be returned. In

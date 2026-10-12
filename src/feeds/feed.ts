@@ -209,7 +209,12 @@ export async function oEmbed(url: string, options: FeedOptions & { maxWidth?: nu
     return null;
   }
   if (!response.ok) throw new YouTubeRequestError("SERVER_ERROR", "oembed", `YouTube answered ${response.status}.`);
-  const data = (await response.json()) as Record<string, string | number>;
+  let data: Record<string, string | number>;
+  try {
+    data = (await response.json()) as Record<string, string | number>;
+  } catch (cause) {
+    throw new YouTubeRequestError("PARSE_ERROR", "oembed", "the answer is not valid JSON.", { cause });
+  }
   return {
     title: String(data.title ?? ""),
     authorName: String(data.author_name ?? ""),

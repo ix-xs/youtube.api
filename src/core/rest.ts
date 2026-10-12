@@ -45,6 +45,17 @@ export interface MethodSpec {
   readonly response?: "json" | "none" | "text";
 }
 
+/** What a `Retry-After` header asks for, in seconds: it holds either a number of seconds or a date. */
+export function retryAfterSeconds(header: string | null, now: number = Date.now()): number | undefined {
+  if (!header) return undefined;
+  const seconds = Number(header);
+  if (Number.isFinite(seconds)) return seconds > 0 ? seconds : undefined;
+  const date = Date.parse(header);
+  if (Number.isNaN(date)) return undefined;
+  const wait = Math.ceil((date - now) / 1000);
+  return wait > 0 ? wait : undefined;
+}
+
 /** Retry policy. */
 export interface RetryOptions {
   /** Retries after the first attempt. Default 3. Use 0 to turn retries off. */
@@ -502,7 +513,14 @@ export class Rest {
       maxSize: spec.upload!.maxSize,
       signal: options?.signal,
       retry: resolveRetry(this.#retry, options?.retry),
-      parseError: (response, text) => this.#toError(spec, url, response, text),
+      parseError: (response, text) => {
+        const error = this.#toError(spec, url, response, text);
+        // A rejected request is still billed, at least one unit.
+        if (response.status >= 400 && response.status < 500 && response.status !== 401 && error.code !== "QUOTA_EXCEEDED") {
+          this.events.emit("quota", this.quota.charge(spec.id, spec.bucket, 1));
+        }
+        return error;
+      },
     });
     this.#account(spec, 200, started);
     return result;
@@ -659,7 +677,6 @@ export class Rest {
     } catch {
       // Not JSON: keep the status text.
     }
-    const retryAfter = Number(response.headers.get("retry-after"));
     return new YouTubeApiError({
       status: response.status,
       message,
@@ -668,7 +685,7 @@ export class Rest {
       reason,
       errors,
       apiStatus,
-      retryAfter: Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
+      retryAfter: retryAfterSeconds(response.headers.get("retry-after")),
       body,
     });
   }

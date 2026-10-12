@@ -1,4 +1,4 @@
-import { YouTubeArgumentError } from "./core/errors.js";
+import { YouTubeArgumentError, YouTubeError, YouTubeRequestError } from "./core/errors.js";
 import type { RequestOptions, Rest } from "./core/rest.js";
 import { METHODS } from "./generated/methods.js";
 import { ReportingJobsApi, type ReportingReport, ReportingReportTypesApi, ReportingReportsApi } from "./generated/reporting.js";
@@ -6,7 +6,8 @@ import { ReportingJobsApi, type ReportingReport, ReportingReportTypesApi, Report
 /**
  * `yt.reporting`: the YouTube Reporting API, which delivers bulk reports as
  * daily CSV files. Schedule a job once, then collect its reports. Needs OAuth
- * with the `yt-analytics.readonly` scope.
+ * with the `yt-analytics.readonly` scope, or `yt-analytics-monetary.readonly`
+ * for reports that carry revenue.
  *
  * @example
  * const job = await yt.reporting.jobs.create({ body: { reportTypeId: "channel_basic_a3", name: "Channel basics" } });
@@ -35,10 +36,15 @@ export class Reporting {
   #url(report: ReportingReport | string): string {
     const url = typeof report === "string" ? report : report.downloadUrl;
     if (!url) throw new YouTubeArgumentError("This report has no download URL.");
-    const { protocol, hostname } = new URL(url);
-    if (protocol !== "https:" || hostname !== "youtubereporting.googleapis.com") {
+    let origin: string;
+    try {
+      ({ origin } = new URL(url));
+    } catch {
+      throw new YouTubeArgumentError(`"${url}" is not the download URL of a report.`);
+    }
+    if (origin !== "https://youtubereporting.googleapis.com") {
       // The access token goes with the request: never send it anywhere else, nor in the clear.
-      throw new YouTubeArgumentError(`Refusing to download a report from "${protocol}//${hostname}": expected https://youtubereporting.googleapis.com.`);
+      throw new YouTubeArgumentError(`Refusing to download a report from "${origin}": expected https://youtubereporting.googleapis.com.`);
     }
     return url;
   }
@@ -52,7 +58,15 @@ export class Reporting {
    * const [header, ...lines] = csv.trim().split("\n");
    */
   async download(report: ReportingReport | string, options?: RequestOptions): Promise<string> {
-    return (await this.downloadResponse(report, options)).text();
+    const response = await this.downloadResponse(report, options);
+    try {
+      return await response.text();
+    } catch (cause) {
+      // The headers arrived, the body did not: say so the way every other call does.
+      if (cause instanceof YouTubeError) throw cause;
+      const aborted = options?.signal?.aborted;
+      throw new YouTubeRequestError(aborted ? "ABORTED" : "NETWORK", "reporting.media.download", aborted ? "the download was aborted." : "the connection dropped while the report was downloading.", { cause });
+    }
   }
 
   /**

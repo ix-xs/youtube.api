@@ -156,7 +156,7 @@ export class QuotaTracker {
     return { day: this.#day, usage: { ...this.#usage }, methods: { ...this.#methods } };
   }
 
-  /** Loads a snapshot. One taken on an earlier Pacific day is ignored. */
+  /** Loads a snapshot. One taken on another Pacific day than today is ignored. */
   restore(snapshot: QuotaSnapshot): void {
     this.#roll();
     if (snapshot.day !== this.#day) return;

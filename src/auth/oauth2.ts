@@ -36,9 +36,10 @@ export interface OAuth2Options {
   /** Tokens saved from a previous session. */
   tokens?: Tokens | undefined;
   /**
-   * Called whenever tokens change: after an exchange and after each refresh.
-   * This is where you persist them. It is awaited, and if it throws, the call
-   * that triggered it fails: tokens that could not be saved are not silently lost.
+   * Called whenever tokens change: after an exchange, after each refresh, and
+   * with an empty object after `revoke()`. This is where you persist them. It
+   * is awaited, and if it throws, the call that triggered it fails: tokens
+   * that could not be saved are not silently lost.
    */
   onTokens?: ((tokens: Tokens) => void | Promise<void>) | undefined;
   /** Custom `fetch`. */
@@ -296,9 +297,15 @@ export class OAuth2 {
     if (!response.ok) await this.#fail(response, "revoke the token");
     this.#epoch++;
     this.#tokens = {};
-    // The stored copy is dead too: tell whoever keeps it.
-    await this.#onTokens?.({});
     this.#events.emit("tokens", {});
+    // The stored copy is dead too: tell whoever keeps it.
+    if (this.#onTokens) {
+      try {
+        await this.#onTokens({});
+      } catch (cause) {
+        throw new YouTubeAuthError("OAUTH_ERROR", `The tokens were revoked but \`onTokens\` failed to forget them (${(cause as Error)?.message ?? cause}).`, { cause });
+      }
+    }
   }
 
   /** Asks Google what an access token is good for: its client, scopes and remaining lifetime. */
@@ -339,7 +346,11 @@ export class OAuth2 {
     };
   }
 
-  /** Waits until the user approves the device, then stores and returns the tokens. */
+  /**
+   * Waits until the user approves the device, then stores and returns the
+   * tokens. Aborting `signal` stops the wait, a request in flight included,
+   * with a `YouTubeRequestError` of code `ABORTED`.
+   */
   async pollDeviceToken(device: DeviceCode, options: { signal?: AbortSignal } = {}): Promise<Tokens> {
     const deadline = Date.now() + device.expiresIn * 1000;
     let interval = device.interval;
@@ -350,8 +361,9 @@ export class OAuth2 {
         throw new YouTubeRequestError("ABORTED", "oauth.pollDeviceToken", "waiting for the device was aborted.", { cause });
       }
       try {
-        return await this.#grant({ grant_type: "urn:ietf:params:oauth:grant-type:device_code", device_code: device.deviceCode });
+        return await this.#grant({ grant_type: "urn:ietf:params:oauth:grant-type:device_code", device_code: device.deviceCode }, options.signal);
       } catch (error) {
+        if (options.signal?.aborted) throw new YouTubeRequestError("ABORTED", "oauth.pollDeviceToken", "waiting for the device was aborted.", { cause: error });
         if (!(error instanceof YouTubeAuthError)) throw error;
         if (error.oauthError === "authorization_pending") continue;
         if (error.oauthError === "slow_down") {
@@ -364,11 +376,12 @@ export class OAuth2 {
     throw new YouTubeAuthError("OAUTH_ERROR", "The device code expired before the user approved it.", { oauthError: "expired_token" });
   }
 
-  #post(url: string, fields: Record<string, string>): Promise<Response> {
+  #post(url: string, fields: Record<string, string>, signal?: AbortSignal): Promise<Response> {
     return this.#fetch(url, {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
       body: new URLSearchParams(fields).toString(),
+      signal: signal ?? null,
     });
   }
 
@@ -385,12 +398,12 @@ export class OAuth2 {
     });
   }
 
-  async #grant(fields: Record<string, string>): Promise<Tokens> {
+  async #grant(fields: Record<string, string>, signal?: AbortSignal): Promise<Tokens> {
     const body: Record<string, string> = { client_id: this.clientId, ...fields };
     if (this.#clientSecret) body.client_secret = this.#clientSecret;
     const epoch = this.#epoch;
     const before = this.#tokens;
-    const response = await this.#post(TOKEN_URL, body);
+    const response = await this.#post(TOKEN_URL, body, signal);
     if (!response.ok) await this.#fail(response, fields.grant_type === "refresh_token" ? "refresh the access token" : "get tokens");
     const data = (await response.json()) as TokenResponse;
     const tokens: Tokens = {

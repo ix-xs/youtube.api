@@ -98,7 +98,7 @@ export class CommentThreads extends CommentThreadsApi {
    * @example
    * for await (const thread of yt.commentThreads.forVideo(videoId, { order: "relevance" })) {
    *   const comment = thread.snippet.topLevelComment.snippet;
-   *   console.log(comment?.authorDisplayName, comment?.textDisplay);
+   *   console.log(comment.authorDisplayName, comment.textDisplay);
    * }
    */
   forVideo<P extends CommentThreadPart = "snippet">(
@@ -180,7 +180,7 @@ export class Subscriptions extends SubscriptionsApi {
    * Finds the authenticated user's subscription to a channel, or `null` when
    * they are not subscribed.
    *
-   * Quota: 1 unit, plus 1 to resolve a handle the first time.
+   * Quota: 1 unit, plus 1 to resolve a handle the first time (2 for a legacy username).
    *
    * @example
    * const subscribed = (await yt.subscriptions.to("@GoogleDevelopers")) !== null;
@@ -193,7 +193,7 @@ export class Subscriptions extends SubscriptionsApi {
   /**
    * Subscribes the authenticated user to a channel.
    *
-   * Quota: 50 units, plus 1 to resolve a handle the first time.
+   * Quota: 50 units, plus 1 to resolve a handle the first time (2 for a legacy username).
    *
    * @example
    * await yt.subscriptions.subscribe("@GoogleDevelopers");

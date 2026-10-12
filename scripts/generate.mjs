@@ -233,8 +233,8 @@ function propType(model, prop, path) {
   return "unknown";
 }
 
-function propDoc(prop) {
-  const blocks = [clean(prop.description)];
+function propDoc(prop, path) {
+  const blocks = [config.schemaDocs?.[path] ?? clean(prop.description)];
   if (prop.enum && prop.enumDescriptions?.some(Boolean)) {
     const lines = prop.enum.map((value, index) => [value, clean(prop.enumDescriptions[index])]).filter(([, text]) => text);
     if (lines.length) blocks.push(`\t${lines.map(([value, text]) => `- \`${value}\`: ${text}`).join("\n")}`);
@@ -256,7 +256,7 @@ function members(model, schema, path, indent) {
   for (const name of sortProps(Object.keys(schema.properties ?? {}))) {
     const prop = schema.properties[name];
     const key = /^[A-Za-z_$][\w$]*$/.test(name) ? name : JSON.stringify(name);
-    out += jsdoc(propDoc(prop), indent);
+    out += jsdoc(propDoc(prop, `${path}.${name}`), indent);
     out += `${indent}${key}${requiredHere.has(name) ? "" : "?"}: ${propType(model, prop, `${path}.${name}`)};\n`;
   }
   return out;

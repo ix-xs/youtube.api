@@ -2,7 +2,8 @@ type Listener<T> = (payload: T) => void | Promise<void>;
 
 /**
  * A small typed event emitter. A listener that throws, or whose promise
- * rejects, never breaks the emitter: the failure goes to the `error` event.
+ * rejects, never breaks the emitter: the failure goes to the `error` event,
+ * and is dropped when nothing listens to that event.
  */
 export class Emitter<Events extends object> {
   readonly #listeners = new Map<keyof Events, Set<Listener<never>>>();

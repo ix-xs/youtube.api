@@ -86,7 +86,7 @@ export class Playlists extends PlaylistsApi {
    * order. Deleted and private videos are skipped, and `limit` counts the
    * videos you get, not the playlist items read.
    *
-   * Quota: 2 units per 50 videos.
+   * Quota: 2 units per 50 playlist items read, deleted and private ones included.
    *
    * @example
    * let total = 0;

@@ -16,9 +16,13 @@ export interface CacheEntry {
  * file. Methods may be synchronous or return promises.
  */
 export interface CacheStore {
+  /** The entry stored under `key`, expired or not: the client checks `expires` and revalidates. */
   get(key: string): CacheEntry | undefined | Promise<CacheEntry | undefined>;
+  /** Stores an entry. */
   set(key: string, entry: CacheEntry): void | Promise<void>;
-  delete(key: string): void | Promise<void>;
+  /** Removes one entry. Optional: the client never calls it, it is there for your own invalidation. */
+  delete?(key: string): void | Promise<void>;
+  /** Removes everything. Called by `yt.clearCache()` when present. */
   clear?(): void | Promise<void>;
 }
 

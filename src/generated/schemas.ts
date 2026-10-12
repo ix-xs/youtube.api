@@ -416,12 +416,8 @@ export interface CaptionSnippet {
    */
   failureReason?: "unknownFormat" | "unsupportedFormat" | "processingFailed";
   /**
-   * Indicates whether YouTube synchronized the caption track to the audio track in the video. The
-   * value will be true if a sync was explicitly requested when the caption track was uploaded. For
-   * example, when calling the captions.insert or captions.update methods, you can set the sync
-   * parameter to true to instruct YouTube to sync the uploaded track to the video. If the value is
-   * false, YouTube uses the time codes in the uploaded caption track to determine when to display
-   * captions.
+   * Whether YouTube timed the track to the audio itself. Tracks uploaded since April 2024 carry their
+   * own timing, so this is false for them: YouTube no longer syncs a transcript for you.
    */
   isAutoSynced?: boolean;
   /**

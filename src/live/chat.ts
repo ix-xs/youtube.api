@@ -1,5 +1,5 @@
 import type { YouTube } from "../client.js";
-import { YouTubeApiError, YouTubeArgumentError, YouTubeRequestError } from "../core/errors.js";
+import { YouTubeApiError, YouTubeArgumentError, YouTubeError, YouTubeRequestError } from "../core/errors.js";
 import type { RequestOptions } from "../core/rest.js";
 import { type Duration, sleep, toMs } from "../core/time.js";
 import { METHODS } from "../generated/methods.js";
@@ -72,7 +72,14 @@ export class LiveChatMessages extends LiveChatMessagesApi {
   async *stream(params: LiveChatMessagesStreamParams, options?: RequestOptions): AsyncGenerator<LiveChatMessageListResponse, void, undefined> {
     const response = await this.rest.raw(METHODS["liveChatMessages.stream"], { ...params }, options);
     if (!response.body) return;
-    for await (const batch of jsonObjects(response.body)) yield batch as LiveChatMessageListResponse;
+    try {
+      for await (const batch of jsonObjects(response.body)) yield batch as LiveChatMessageListResponse;
+    } catch (cause) {
+      // The connection broke while it was being read: say so the way every other call does.
+      if (cause instanceof YouTubeError) throw cause;
+      const aborted = options?.signal?.aborted;
+      throw new YouTubeRequestError(aborted ? "ABORTED" : "NETWORK", "liveChatMessages.stream", aborted ? "the stream was aborted." : "the connection dropped.", { cause });
+    }
   }
 }
 
@@ -96,7 +103,11 @@ export interface ChatReadOptions {
   profileImageSize?: number | undefined;
   /** Language of the system messages, for example `"fr"`. */
   hl?: string | undefined;
-  /** `"poll"` (default) asks again at the pace YouTube gives. `"stream"` keeps one connection open, experimental. */
+  /**
+   * `"poll"` (default) asks again at the pace YouTube gives. `"stream"` keeps
+   * one connection open, experimental: a connection that drops is reopened
+   * from where it stopped, three times in a row at most.
+   */
   mode?: "poll" | "stream" | undefined;
 }
 
@@ -109,6 +120,8 @@ export interface ChatSubscription {
 }
 
 const ENDED = new Set(["liveChatEnded", "liveChatDisabled"]);
+/** How many times in a row a dropped stream is reconnected before the failure is thrown. */
+const STREAM_RECONNECTS = 3;
 
 /**
  * One live chat: read it, write to it, moderate it. Get one with
@@ -157,6 +170,8 @@ export class LiveChat {
     };
     let pageToken: string | undefined;
     let first = true;
+    /** Connections of the stream that broke in a row without delivering anything. */
+    let drops = 0;
 
     while (!signal?.aborted) {
       const params = { ...base, ...(pageToken ? { pageToken } : {}) };
@@ -165,6 +180,7 @@ export class LiveChat {
           for await (const batch of this.#yt.liveChatMessages.stream({ ...params, part: [...base.part] }, request)) {
             if (!first || history) yield* (batch.items ?? []) as ChatMessage[];
             first = false;
+            drops = 0;
             pageToken = batch.nextPageToken ?? pageToken;
             if (batch.offlineAt) return;
           }
@@ -182,6 +198,15 @@ export class LiveChat {
         if (signal?.aborted) return;
         if (error instanceof YouTubeRequestError && error.code === "ABORTED") return;
         if (error instanceof YouTubeApiError && error.reason && ENDED.has(error.reason)) return;
+        // A stream that drops is reconnected from the last token, a few times in a row at most.
+        if (options.mode === "stream" && error instanceof YouTubeRequestError && error.code === "NETWORK" && ++drops <= STREAM_RECONNECTS) {
+          try {
+            await sleep(Math.max(1000, minInterval) * drops, signal);
+          } catch {
+            return;
+          }
+          continue;
+        }
         throw error;
       }
     }

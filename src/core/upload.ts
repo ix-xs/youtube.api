@@ -315,11 +315,15 @@ async function resumable<T>(
     throw new YouTubeUploadError(`${request.method}: ${message}`, { sessionUri, uploaded: offset, cause });
   };
 
-  /** The session is gone: the error carries no `sessionUri`, since there is nothing left to resume. */
-  const expired = (): never => {
+  /** The session cannot be continued: the error carries no `sessionUri`, since there is nothing left to resume. */
+  const dead = (message: string): never => {
     sessionUri = undefined;
-    return fail("the upload session expired. Start the upload again.");
+    return fail(`${message} Start the upload again.`);
   };
+  const expired = (): never => dead("the upload session expired.");
+  const lost = (): never => dead("the server lost bytes it had confirmed.");
+  /** An answer that says "try again", not "this is the result". */
+  const transient = (status: number) => status >= 500 || status === 408 || status === 429;
 
   /** Asks the server how many bytes it has. Returns the final response if the upload is already complete. */
   const status = async (): Promise<Response | undefined> => {
@@ -347,6 +351,10 @@ async function resumable<T>(
     } catch (cause) {
       if (cause instanceof YouTubeUploadError || cause instanceof YouTubeRequestError) throw cause;
       return fail(`could not reach the upload session (${(cause as Error)?.message ?? cause}).`, cause);
+    }
+    if (done && transient(done.status)) {
+      void done.body?.cancel().catch(() => {});
+      return fail(`the upload session answered ${done.status}. Pass \`resumeUri\` again to resume.`);
     }
     if (done) return readResult<T>(request, done);
     await source.seek(offset);
@@ -401,7 +409,7 @@ async function resumable<T>(
       void response.body?.cancel().catch(() => {});
       // The bytes before this chunk are gone from memory: a server that
       // steps back behind them cannot be served, and guessing would corrupt the file.
-      if (offset < chunkStart) return fail("the server lost bytes it had confirmed. Start the upload again.");
+      if (offset < chunkStart) return lost();
       report(offset, sessionUri);
       if (offset >= chunkStart + chunk.data.byteLength) {
         if (chunk.last) return fail("the server confirmed every byte but did not finish the upload.");
@@ -429,12 +437,14 @@ async function resumable<T>(
     try {
       await sleep(backoff / 2 + Math.random() * (backoff / 2), request.signal);
       const done = await status();
-      if (done) return readResult<T>(request, done);
+      // A probe answered by an overloaded server is one more failed attempt, not the result.
+      if (done && !transient(done.status)) return readResult<T>(request, done);
+      void done?.body?.cancel().catch(() => {});
     } catch (cause) {
       if (cause instanceof YouTubeUploadError || cause instanceof YouTubeRequestError) throw cause;
       if (request.signal?.aborted) return fail("aborted", cause);
       // The status probe failed too: the next round of the loop retries.
     }
-    if (offset < chunkStart) return fail("the server lost bytes it had confirmed. Start the upload again.");
+    if (offset < chunkStart) return lost();
   }
 }

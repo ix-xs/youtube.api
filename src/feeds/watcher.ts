@@ -217,7 +217,14 @@ export class Watcher extends Emitter<WatcherEvents> implements AsyncIterable<Wat
       // A reference that matched nothing is reported once, then left alone for
       // a while: looking it up again every round would spend quota on a typo.
       if (Date.now() < state.missingUntil) return [];
-      const id = isChannelId(state.ref) ? state.ref : await this.#client?.channels.resolveId(state.ref);
+      let id: string | null | undefined;
+      try {
+        id = isChannelId(state.ref) ? state.ref : await this.#client?.channels.resolveId(state.ref);
+      } catch (error) {
+        // A reference that cannot name a channel will not start to: same treatment.
+        if (error instanceof YouTubeArgumentError) state.missingUntil = Date.now() + MISSING_COOLDOWN;
+        throw error;
+      }
       if (!id) {
         state.missingUntil = Date.now() + MISSING_COOLDOWN;
         throw new YouTubeArgumentError(`No channel found for "${state.ref}". It will be looked up again in 6 hours.`);
