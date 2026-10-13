@@ -115,7 +115,8 @@ export default defineConfig({
         {
           label: "Start",
           translations: { fr: "Démarrer" },
-          items: [{ label: "Introduction", translations: { fr: "Introduction" }, slug: "index" }, ...pages("start/quick-start", "start/credentials", "start/migrating-from-v1")],
+          // The landing page is not listed: the sidebar only holds pages of the documentation, and the brand in the header leads home.
+          items: pages("start/quick-start", "start/credentials", "start/migrating-from-v1"),
         },
         section("Basics", "Bases", "basics", false),
         section("Authentication", "Authentification", "auth"),
