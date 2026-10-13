@@ -10,6 +10,11 @@
 //
 //   node scripts/reference.mjs           write the files
 //   node scripts/reference.mjs --check   fail if a file is out of date
+//
+// The descriptions of methods and exports come from the source, in English.
+// Their French is in scripts/reference.fr.json, keyed by the English sentence:
+// when a description is added or reworded, the script stops and lists what is
+// left to translate.
 
 import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -19,6 +24,8 @@ import { fileURLToPath } from "node:url";
 import * as config from "../../scripts/api.config.mjs";
 
 const CHECK = process.argv.includes("--check");
+/** Writes the sentences that still need a translation to this file, as a skeleton to fill in. */
+const TODO = process.argv.find((argument) => argument.startsWith("--todo="))?.slice("--todo=".length);
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..", "..");
 const require = createRequire(path.join(root, "package.json"));
@@ -193,7 +200,7 @@ const WORDS = {
       title: "Toutes les méthodes",
       description: (count) => `Les ${count} méthodes des API YouTube Data, Analytics et Reporting, avec ce que fait chacune, ce qu'elle coûte et les identifiants qu'elle demande.`,
       intro:
-        "Chaque nom de méthode mène à la référence de Google. Les mêmes informations sont dans votre éditeur : survolez une méthode pour voir sa description, son coût en quota et un exemple. Les descriptions viennent du code source, en anglais comme dans votre éditeur.",
+        "Chaque nom de méthode mène à la référence de Google. Les mêmes informations sont dans votre éditeur : survolez une méthode pour voir sa description, son coût en quota et un exemple.",
       quota: "- **Quota** est le coût d'un appel, en unités. Trois méthodes puisent dans une enveloppe qui leur est propre : voir [Quota](/basics/quota/).",
       auth: "- **Auth** vaut `clé` quand une clé d'API suffit pour les données publiques, `OAuth` quand la méthode demande toujours un utilisateur. Une méthode `clé` demande quand même OAuth pour des données privées ou avec des paramètres comme `mine`.",
       count: (count, live) => `${count} méthodes${live ? ", diffusion en direct comprise" : ""}.`,
@@ -226,7 +233,7 @@ const WORDS = {
       title: "Tous les exports",
       description: "Tout ce que le paquet exporte, avec une ligne sur ce qu'est chaque élément.",
       intro:
-        "Deux points d'entrée : `@ix-xs/youtube.api` fonctionne partout où `fetch` existe, `@ix-xs/youtube.api/node` regroupe les quelques fonctions qui ont besoin de Node.js lui-même. Les descriptions viennent des commentaires du code source, en anglais comme dans votre éditeur.",
+        "Deux points d'entrée : `@ix-xs/youtube.api` fonctionne partout où `fetch` existe, `@ix-xs/youtube.api/node` regroupe les quelques fonctions qui ont besoin de Node.js lui-même.",
       classes: "Classes",
       functions: "Fonctions",
       constants: "Constantes",
@@ -248,6 +255,23 @@ const WORDS = {
     },
   },
 };
+
+/** Translations of what the source describes in English: `{ "English sentence": "Phrase française" }`. */
+const TRANSLATIONS = { fr: JSON.parse(readFileSync(path.join(here, "reference.fr.json"), "utf8")) };
+const untranslated = new Set();
+const translated = new Set();
+
+/** A description taken from the source, in the language of the page. */
+function say(sentence, language) {
+  if (language === "en" || !sentence.trim()) return sentence;
+  const found = TRANSLATIONS[language][sentence];
+  if (found) {
+    translated.add(sentence);
+    return found;
+  }
+  untranslated.add(sentence);
+  return sentence;
+}
 
 /** The name of a guide in a language: the title of its translation when there is one. */
 function guideName(address, language) {
@@ -297,7 +321,8 @@ ${words.auth}
         if (group[0].guide) out += `${words.guide(guideName(group[0].guide, language), group[0].guide)}\n\n`;
         out += api.key === "data" ? `${words.columns}\n| --- | --- | --- | --- |\n` : `${words.shortColumns}\n| --- | --- |\n`;
         for (const method of group) {
-          const what = method.deprecated ? `${words.deprecated} ${method.summary}` : method.summary;
+          const summary = say(method.summary, language);
+          const what = method.deprecated ? `${words.deprecated} ${summary}` : summary;
           out += api.key === "data" ? `| ${linked(method)} | ${what} | ${cost(method)} | ${method.oauth ? "OAuth" : words.key} |\n` : `| ${linked(method)} | ${what} |\n`;
         }
         out += "\n";
@@ -368,7 +393,7 @@ function readExports() {
       else if (symbol.flags & ts.SymbolFlags.Function) kind = "function";
       else if (symbol.flags & ts.SymbolFlags.Variable) kind = "constant";
       const doc = ts.displayPartsToString(symbol.getDocumentationComment(checker)).trim();
-      return { name: exported.getName(), kind, generated, summary: doc ? firstSentence(doc.split("\n\n")[0]) : "" };
+      return { name: exported.getName(), kind, generated, summary: doc ? firstSentence(doc.split("\n\n")[0]).replace(/\{@link ([^}]+)\}/g, "`$1`") : "" };
     });
   };
 
@@ -399,7 +424,7 @@ function exportsPage(language) {
   const table = (items) =>
     `${words.columns}\n| --- | --- |\n${[...items]
       .sort((a, b) => a.name.localeCompare(b.name))
-      .map((item) => `| \`${item.name}\` | ${item.summary.replace(/\|/g, "\\|").replace(/\{@link ([^}]+)\}/g, "`$1`") || " "} |`)
+      .map((item) => `| \`${item.name}\` | ${say(item.summary, language).replace(/\|/g, "\\|") || " "} |`)
       .join("\n")}\n`;
 
   return `---
@@ -541,6 +566,17 @@ const files = new Map([
   ["src/data/parts.json", `${JSON.stringify(partsData(), null, 2)}\n`],
   ["src/data/parts.worst.json", `${JSON.stringify(partsData(true), null, 2)}\n`],
 ]);
+
+if (untranslated.size) {
+  if (TODO) await writeFile(TODO, `${JSON.stringify(Object.fromEntries([...untranslated].map((sentence) => [sentence, ""])), null, 2)}\n`);
+  console.error(`${untranslated.size} description(s) have no French in docs/scripts/reference.fr.json:\n${[...untranslated].map((sentence) => `  ${sentence}`).join("\n")}`);
+  process.exit(1);
+}
+const unused = Object.keys(TRANSLATIONS.fr).filter((sentence) => !translated.has(sentence));
+if (unused.length) {
+  console.error(`${unused.length} entr${unused.length === 1 ? "y" : "ies"} of docs/scripts/reference.fr.json translate nothing any more, remove them:\n${unused.map((sentence) => `  ${sentence}`).join("\n")}`);
+  process.exit(1);
+}
 
 let stale = 0;
 for (const [file, content] of files) {

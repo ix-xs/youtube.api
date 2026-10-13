@@ -86,7 +86,7 @@ npm run reference
 
 and commit the result. `node scripts/reference.mjs --check` fails when a generated page is out of date; the deploy workflow runs it.
 
-The three pages are written in each language. Their own words are translated in the script; what describes a method or an export comes from the source, in English, as an editor shows it. The French methods page names each guide by the title of its French page, so run the script again after translating a title.
+The three pages are written in each language. Their own words are translated in the script. What describes a method or an export comes from the source, in English, and its French is in `scripts/reference.fr.json`, keyed by the English sentence: after adding or rewording a description, the script stops and lists the sentences left to translate, and `node scripts/reference.mjs --todo=missing.json` writes them to a file to fill in. An entry that translates nothing any more must be removed, the script says which. The French methods page names each guide by the title of its French page, so run the script again after translating a title.
 
 ## Develop
 

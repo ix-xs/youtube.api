@@ -238,7 +238,7 @@ La bannière se définit de la même façon, après l'envoi de l'image : voir [E
 
 ## Modifier l'onglet d'accueil
 
-Les sections de chaîne sont les étagères de l'onglet d'accueil. Les lire coûte 1 unité et fonctionne avec une clé d'API. Les écrire exige OAuth et coûte 50 unités par appel.
+Les sections de chaîne sont les rangées de l'onglet d'accueil. Les lire coûte 1 unité et fonctionne avec une clé d'API. Les écrire exige OAuth et coûte 50 unités par appel.
 
 ```ts
 const { items } = await yt.channelSections.list({
@@ -271,7 +271,7 @@ await yt.channelSections.update({
 await yt.channelSections.delete({ id: section.id });
 ```
 
-Une chaîne peut avoir 10 sections au plus. `snippet.type` indique ce que montre l'étagère : `"singlePlaylist"`, `"multiplePlaylists"`, `"multipleChannels"`, `"recentUploads"`, `"popularUploads"` et d'autres, tous listés par le type. `contentDetails.playlists` porte les identifiants de playlist des deux types de playlist, `contentDetails.channels` les identifiants de chaîne de `"multipleChannels"`. Comme pour toute mise à jour, une partie que vous envoyez remplace toute la partie.
+Une chaîne peut avoir 10 sections au plus. `snippet.type` indique ce que montre la rangée : `"singlePlaylist"`, `"multiplePlaylists"`, `"multipleChannels"`, `"recentUploads"`, `"popularUploads"` et d'autres, tous listés par le type. `contentDetails.playlists` porte les identifiants de playlist des deux types de playlist, `contentDetails.channels` les identifiants de chaîne de `"multipleChannels"`. Comme pour toute mise à jour, une partie que vous envoyez remplace toute la partie.
 
 `list` accepte `channelId`, `mine: true` ou `id`.
 

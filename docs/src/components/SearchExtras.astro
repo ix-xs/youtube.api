@@ -21,8 +21,8 @@ const STARTING_POINTS = [
   "resources/uploads",
   "reference/methods",
 ];
-/** Searches that show what the index knows: a method, a concept, an error. */
-const QUERIES = ["latestVideos", "quota", "OAuth2", "live chat", "upload"];
+/** Searches that show what the index knows: a method, a concept, an error. Each language searches its own pages. */
+const QUERIES = t("search.queries").split("|");
 
 /** The part of the documentation a page belongs to, as the sidebar names it. */
 function area(slug: string): string {
